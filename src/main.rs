@@ -3,6 +3,7 @@ mod completion;
 mod config;
 mod dates;
 mod git;
+mod holidays;
 mod quickadd;
 mod store;
 mod task;

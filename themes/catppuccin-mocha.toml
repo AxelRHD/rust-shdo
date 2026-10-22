@@ -17,3 +17,5 @@ today = "#f9e2af"         # yellow
 done = "#a6e3a1"
 key = "#cba6f7"           # mauve
 warn = "#fab387"          # peach
+weekend = "#7f849c"
+holiday = "#fab387"

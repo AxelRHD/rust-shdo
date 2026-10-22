@@ -1,6 +1,7 @@
 //! Event-Loop, Terminal-Setup und -Teardown.
 
 mod app;
+mod calendar;
 mod form;
 mod ui;
 

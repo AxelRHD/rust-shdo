@@ -8,6 +8,7 @@ use ratatui::widgets::{Block, BorderType, Clear, Paragraph, Wrap};
 use unicode_width::UnicodeWidthStr;
 
 use super::app::{App, Level, Mode};
+use super::calendar;
 use super::form::{Field, Form, Input, PRIO_NAMES};
 use crate::dates;
 use crate::task::Task;
@@ -71,6 +72,10 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
             ("s", "Sync mit Git-Remote"),
             ("R", "neu laden"),
             ("v", "Spalte „Erledigt“ ein-/ausblenden"),
+            (
+                "c",
+                "Kalender ein-/ausblenden (Anzahl fälliger Tasks je Tag)",
+            ),
             ("t", "Theme wählen"),
             ("?", "diese Hilfe"),
             ("q / Esc", "beenden bzw. abbrechen"),
@@ -103,6 +108,17 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     .areas(area);
 
     draw_header(f, app, &c, header);
+    // Kalender links, solange daneben noch zwei Board-Spalten Platz haben
+    let min_board = MIN_COLUMN_WIDTH * 2.min(app.visible_columns() as u16);
+    let body = if app.show_calendar && body.width >= calendar::WIDTH + min_board {
+        let [cal, rest] =
+            Layout::horizontal([Constraint::Length(calendar::WIDTH), Constraint::Min(0)])
+                .areas(body);
+        calendar::draw(f, app, &c, cal);
+        rest
+    } else {
+        body
+    };
     draw_board(f, app, &c, body);
     draw_status(f, app, &c, status);
     f.render_widget(Paragraph::new(keys), keybar);
@@ -472,6 +488,7 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
                 k.extend([("f", "Filter"), ("b", "Bucket")]);
             }
             k.push(("v", "Erledigt ein/aus"));
+            k.push(("c", "Kalender"));
             k.extend([("s", "Sync"), ("t", "Theme"), ("?", "Hilfe"), ("q", "Ende")]);
             k
         }

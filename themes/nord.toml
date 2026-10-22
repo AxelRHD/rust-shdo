@@ -17,3 +17,5 @@ today = "#ebcb8b"         # nord13
 done = "#a3be8c"          # nord14
 key = "#b48ead"           # nord15
 warn = "#d08770"          # nord12
+weekend = "#7b88a1"
+holiday = "#d08770"

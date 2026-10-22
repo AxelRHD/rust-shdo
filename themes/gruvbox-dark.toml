@@ -17,3 +17,5 @@ today = "#fabd2f"         # yellow
 done = "#b8bb26"
 key = "#d3869b"           # purple
 warn = "#fe8019"          # orange
+weekend = "#a89984"
+holiday = "#fe8019"

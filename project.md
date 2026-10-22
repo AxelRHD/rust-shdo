@@ -34,7 +34,7 @@ welche Tasten es gibt. Die CLI dient der schnellen Erfassung und Skripten.
 - `ratatui` (inkl. re-exportiertem `crossterm`) für die TUI
 - `clap` (derive) für die CLI
 - `toml_edit` zum Schreiben (Kommentare/Formatierung bleiben erhalten), `toml` + `serde` zum Lesen von Configs
-- `jiff` für Datum/Zeit
+- `jiff` für Datum/Zeit; `holiday_de` für Feiertage (bringt `chrono` mit, nur an der Schnittstelle)
 - `fastrand` für IDs, `anyhow` für Fehler, `unicode-width` für Kürzungen
 - `git` über `std::process::Command`, keine libgit2-Abhängigkeit
 - Dev: `tempfile`
@@ -53,6 +53,8 @@ editor = "hx"        # optional
 theme = "tokyonight" # wird von der TUI geschrieben (`t`)
 buckets = ["work"]   # angezeigte Buckets, wird von der TUI geschrieben (`f`)
 show_done = true     # Spalte „Erledigt“ anzeigen, wird von der TUI geschrieben (`v`)
+show_calendar = true # Kalenderleiste anzeigen, wird von der TUI geschrieben (`c`)
+holidays = "bw"      # Bundesland für Feiertage (bw, by, be, bb, hb, hh, he, mv, ni, nw, rp, sl, sn, st, sh, th)
 ```
 
 - Datenverzeichnis: `--dir` > `dir` aus der Config > `~/tasks`
@@ -292,6 +294,7 @@ Global: --dir <pfad>
 | `E`             | Task-Datei im Editor öffnen, danach neu laden           |
 | `b`             | Bucket setzen (Auswahlliste)                            |
 | `f`             | Bucket-Filter (Checkboxen)                              |
+| `c`             | Kalenderleiste ein-/ausblenden, lokal gespeichert       |
 | `v`             | Letzte Spalte (Erledigt) ein-/ausblenden, lokal gespeichert; Kopfzeile zeigt „N Erledigt ausgeblendet“ |
 | `r`             | Titel umbenennen                                        |
 | `1`–`3`         | Prio setzen                                             |
@@ -343,10 +346,37 @@ Global: --dir <pfad>
 - Beim Öffnen des Editors wird die TUI sauber verlassen und danach wiederhergestellt;
   das Terminal wird auch bei Panics zurückgesetzt
 
+### Kalenderleiste (`c`)
+
+```
+┌Kalender─────────────────┐
+│      Oktober 2026       │
+│ KW Mo Di Mi Do Fr Sa So │
+│ 40          1  2  3  4  │
+│ 43 19 20 21 22¹23²24¹25¹│
+│ 44 26¹27 28 29³30 31    │
+│                         │
+│ 03.10. Dt. Einheit      │
+└─────────────────────────┘
+```
+
+- Links neben dem Board, reine Anzeige (kein Fokus, kein Filter); ein-/ausblenden mit `c`,
+  lokal gespeichert als `show_calendar`
+- Vormonat, aktueller Monat, Folgemonat untereinander; reicht die Höhe nicht, nur aktueller +
+  Folgemonat bzw. nur der aktuelle. Passen daneben keine zwei Board-Spalten mehr, wird die
+  Leiste automatisch ausgeblendet
+- Anzahl fälliger Tasks als hochgestellte Ziffer hinter dem Tag (`22²`, ab 10 `⁺`); rot, wenn der
+  Tag vorbei ist. Gezählt werden die sichtbaren offenen Tasks (Bucket-Filter, ohne Erledigt)
+- Heute invertiert, Wochenenden gedimmt, Feiertage kräftig, vergangene Tage gedimmt; die
+  Fälligkeit der ausgewählten Karte ist hervorgehoben und wandert mit `j`/`k` mit
+- Darunter die Feiertage der angezeigten Monate mit Kurznamen
+- Feiertage über das Crate `holiday_de` (alle 16 Bundesländer, inkl. Sonderfälle wie
+  Reformationstag 2017); Bundesland per `holidays = "bw"` in `config.toml` (Default `bw`)
+
 ### Themes
 
 - Semantische Farb-Tokens: `bg`, `fg`, `dim`, `border`, `border_active`, `title`, `accent`,
-  `selection`, `prio_high`, `prio_low`, `overdue`, `today`, `done`, `key`, `warn`
+  `selection`, `prio_high`, `prio_low`, `overdue`, `today`, `done`, `key`, `warn`, `weekend`, `holiday`
 - Farben als `#rrggbb` oder ANSI-Namen (`red`, `darkgray`, `reset`, …)
 - Eingebaut (`themes/*.toml`, per `include_str!` im Binary): `tokyonight` (Default), `nord`,
   `gruvbox-dark`, `catppuccin-mocha`, hell: `gruvbox-light`, `catppuccin-latte`, sowie `terminal`
@@ -399,10 +429,6 @@ mise-Tasks in `.mise-tasks/`:
 Tests arbeiten in temporären Verzeichnissen, nie in `~/tasks`; Datumstests mit fester Referenzzeit.
 
 ## Später / Ideen
-
-- Kalender-Seitenleiste (Monat mit KW, Wochenenden soft, Feiertage BW deutlich, Tage mit
-  Fälligkeiten markiert, „Demnächst“-Liste; `Tab` fokussiert, Filter auf Tag/KW; Feiertage
-  als Tabelle je Bundesland, später `holidays = "by"` konfigurierbar) – Details offen
 
 - Auto-Sync beim Start/Beenden der TUI (optional, per Config)
 - Eigene Themes in der TUI anlegen/löschen – löschbar nur selbst angelegte, nie eingebaute

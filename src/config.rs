@@ -22,6 +22,12 @@ pub const DEFAULT_CONFIG: &str = r#"# shdo – lokale Einstellungen (werden nich
 
 # Spalte „Erledigt“ anzeigen, wird über `v` in der TUI gesetzt
 # show_done = true
+
+# Kalenderleiste anzeigen, wird über `c` in der TUI gesetzt
+# show_calendar = true
+
+# Feiertage im Kalender: Bundesland-Kürzel (bw, by, be, bb, hb, hh, he, mv, ni, nw, rp, sl, sn, st, sh, th)
+# holidays = "bw"
 "#;
 
 #[derive(Debug, Default, serde::Deserialize)]
@@ -32,6 +38,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub buckets: Vec<String>,
     pub show_done: Option<bool>,
+    pub show_calendar: Option<bool>,
+    pub holidays: Option<String>,
 }
 
 /// `$SHDO_CONFIG_DIR`, sonst `$XDG_CONFIG_HOME/shdo`, sonst `~/.config/shdo`.

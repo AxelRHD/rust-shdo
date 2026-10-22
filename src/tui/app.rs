@@ -11,6 +11,7 @@ use super::form::{Form, Input};
 use crate::board::{self, Board, Filter, NO_BUCKET};
 use crate::config::{self, AppConfig};
 use crate::git::Git;
+use crate::holidays::Region;
 use crate::store::{StatusDef, Store};
 use crate::task::{PRIO_DEFAULT, Task};
 use crate::theme::{self, Theme};
@@ -83,6 +84,9 @@ pub struct App {
     pub mode: Mode,
     /// Letzte Spalte (erledigt) anzeigen; lokal gespeichert.
     pub show_done: bool,
+    /// Kalenderleiste anzeigen; lokal gespeichert.
+    pub show_calendar: bool,
+    pub region: Region,
     pub status: Option<(Level, String)>,
     pub themes: Vec<Theme>,
     pub theme: usize,
@@ -112,6 +116,19 @@ impl App {
             buckets: cfg.buckets.clone(),
         };
         let show_done = cfg.show_done.unwrap_or(true);
+        let show_calendar = cfg.show_calendar.unwrap_or(true);
+        let region = match cfg.holidays.as_deref() {
+            None => Region::default(),
+            Some(code) => Region::from_code(code).unwrap_or_else(|| {
+                let codes: Vec<_> = Region::codes().collect();
+                theme_warnings.push(format!(
+                    "holidays = „{code}“ unbekannt, nutze {} (möglich: {})",
+                    crate::holidays::DEFAULT_REGION,
+                    codes.join(", ")
+                ));
+                Region::default()
+            }),
+        };
         let board = Board::load(&store, &filter)?;
         let n = board.columns.len();
         Ok(App {
@@ -127,6 +144,8 @@ impl App {
             col_offset: 0,
             mode: Mode::Normal,
             show_done,
+            show_calendar,
+            region,
             status: None,
             themes,
             theme,
@@ -176,6 +195,17 @@ impl App {
             format!("„{name}“ eingeblendet")
         } else {
             format!("„{name}“ ausgeblendet")
+        };
+        self.report(res, msg);
+    }
+
+    fn toggle_calendar(&mut self) {
+        self.show_calendar = !self.show_calendar;
+        let res = config::set_bool(&self.cfg_path, "show_calendar", self.show_calendar);
+        let msg = if self.show_calendar {
+            "Kalender eingeblendet"
+        } else {
+            "Kalender ausgeblendet"
         };
         self.report(res, msg);
     }
@@ -384,6 +414,7 @@ impl App {
             }
             KeyCode::Char('f') => self.open_filter(),
             KeyCode::Char('v') => self.toggle_show_done(),
+            KeyCode::Char('c') => self.toggle_calendar(),
             KeyCode::Char('b') => self.open_pick_bucket(),
             KeyCode::Char('s') => self.start_sync(),
             KeyCode::Char('R') => {

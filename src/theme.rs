@@ -46,6 +46,8 @@ pub struct Palette {
     pub done: Color,
     pub key: Color,
     pub warn: Color,
+    pub weekend: Color,
+    pub holiday: Color,
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +87,8 @@ impl Palette {
                 "done" => &mut self.done,
                 "key" => &mut self.key,
                 "warn" => &mut self.warn,
+                "weekend" => &mut self.weekend,
+                "holiday" => &mut self.holiday,
                 other => return Err(anyhow!("unbekanntes Farb-Token „{other}“")),
             };
             *slot = parse_color(val).with_context(|| format!("Token „{key}“"))?;
@@ -110,6 +114,8 @@ fn fallback() -> Palette {
         done: Color::Green,
         key: Color::Magenta,
         warn: Color::Yellow,
+        weekend: Color::DarkGray,
+        holiday: Color::LightRed,
     };
     let raw = BUILTIN
         .iter()
@@ -186,7 +192,7 @@ mod tests {
         // Jedes eingebaute Theme setzt alle Tokens selbst (nichts erbt still vom Default).
         for (id, raw) in BUILTIN {
             let file: ThemeFile = toml::from_str(raw).unwrap();
-            assert_eq!(file.colors.len(), 15, "{id}");
+            assert_eq!(file.colors.len(), 17, "{id}");
         }
     }
 
