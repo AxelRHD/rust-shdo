@@ -1,6 +1,7 @@
 //! Input fields and the form for new or edited tasks.
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use rust_i18n::t;
 
 use crate::board::Board;
 use crate::task::{PRIO_DEFAULT, Task};
@@ -67,15 +68,16 @@ pub enum Field {
 }
 
 impl Field {
-    pub fn label(self) -> &'static str {
-        match self {
-            Field::Title => "Titel",
-            Field::Status => "Status",
-            Field::Prio => "Prio",
-            Field::Due => "Fällig",
-            Field::Bucket => "Bucket",
-            Field::Note => "Notiz",
-        }
+    pub fn label(self) -> String {
+        let key = match self {
+            Field::Title => "form.field.title",
+            Field::Status => "form.field.status",
+            Field::Prio => "form.field.prio",
+            Field::Due => "form.field.due",
+            Field::Bucket => "form.field.bucket",
+            Field::Note => "form.field.note",
+        };
+        t!(key).into_owned()
     }
 
     pub fn is_text(self) -> bool {
@@ -83,7 +85,15 @@ impl Field {
     }
 }
 
-pub const PRIO_NAMES: [&str; 3] = ["hoch", "normal", "niedrig"];
+/// Localized name of a priority (1 = high … 3 = low).
+pub fn prio_name(prio: u8) -> String {
+    let key = match prio {
+        1 => "form.prio.high",
+        3 => "form.prio.low",
+        _ => "form.prio.normal",
+    };
+    t!(key).into_owned()
+}
 
 pub struct Form {
     /// `None` = new task, otherwise the ID of the edited task.
@@ -178,10 +188,10 @@ impl Form {
             .map(|i| self.bucket_keys[i].as_str())
     }
 
-    pub fn bucket_label(&self) -> &str {
+    pub fn bucket_label(&self) -> String {
         match self.bucket.checked_sub(1) {
-            Some(i) => &self.bucket_names[i],
-            None => "ohne Bucket",
+            Some(i) => self.bucket_names[i].clone(),
+            None => t!("bucket.none").into_owned(),
         }
     }
 

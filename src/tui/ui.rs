@@ -5,11 +5,12 @@ use ratatui::layout::{Alignment, Constraint, Layout, Position, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Clear, Paragraph, Wrap};
+use rust_i18n::t;
 use unicode_width::UnicodeWidthStr;
 
 use super::app::{App, Level, Mode};
 use super::calendar;
-use super::form::{Field, Form, Input, PRIO_NAMES};
+use super::form::{Field, Form, Input, prio_name};
 use crate::dates;
 use crate::task::Task;
 use crate::theme::Palette;
@@ -17,82 +18,77 @@ use crate::theme::Palette;
 const MIN_COLUMN_WIDTH: u16 = 24;
 const CARD_HEIGHT: u16 = 2;
 
-pub const HELP: &[(&str, &[(&str, &str)])] = &[
+/// Help sections: (section title key, [(keys, description key)]).
+const HELP: &[(&str, &[(&str, &str)])] = &[
     (
-        "Navigation",
+        "help.nav",
         &[
-            ("h / ←", "Spalte links"),
-            ("l / →", "Spalte rechts"),
-            ("j / ↓", "nächste Karte"),
-            ("k / ↑", "vorherige Karte"),
-            ("g / G", "erste / letzte Karte"),
-            ("⏎", "Details anzeigen"),
+            ("h / ←", "help.nav.left"),
+            ("l / →", "help.nav.right"),
+            ("j / ↓", "help.nav.down"),
+            ("k / ↑", "help.nav.up"),
+            ("g / G", "help.nav.first_last"),
+            ("⏎", "help.nav.details"),
         ],
     ),
     (
-        "Karten",
+        "help.cards",
         &[
-            ("n", "neue Karte (Formular, Status der Spalte vorbelegt)"),
-            ("e", "Karte im Formular bearbeiten"),
-            ("E", "Task-Datei im Editor öffnen"),
-            ("H / ⇧←", "Karte nach links (vorheriger Status)"),
-            ("L / ⇧→", "Karte nach rechts (nächster Status)"),
-            ("x", "erledigt / wieder offen"),
-            ("r", "Titel umbenennen"),
-            ("1 2 3", "Prio hoch / normal / niedrig"),
-            ("D", "Fälligkeit setzen (leer = entfernen)"),
-            ("b", "Bucket setzen"),
-            ("d", "löschen"),
+            ("n", "help.cards.new"),
+            ("e", "help.cards.edit"),
+            ("E", "help.cards.editor"),
+            ("H / ⇧←", "help.cards.move_left"),
+            ("L / ⇧→", "help.cards.move_right"),
+            ("x", "help.cards.done"),
+            ("r", "help.cards.rename"),
+            ("1 2 3", "help.cards.prio"),
+            ("D", "help.cards.due"),
+            ("b", "help.cards.bucket"),
+            ("d", "help.cards.delete"),
         ],
     ),
     (
-        "Formular",
+        "help.form",
         &[
-            ("Tab ↓ / ⇧Tab ↑", "nächstes / voriges Feld"),
-            ("← → Space", "Auswahl ändern (Status, Prio, Bucket)"),
-            ("⏎", "speichern (aus jedem Feld)"),
-            ("Esc", "verwerfen"),
-            ("Titel", "P1–P3, due:fr, @work direkt im Titel gehen auch"),
+            ("Tab ↓ / ⇧Tab ↑", "help.form.fields"),
+            ("← → Space", "help.form.choice"),
+            ("⏎", "help.form.save"),
+            ("Esc", "help.form.discard"),
+            ("P1 due: @", "help.form.tokens"),
         ],
     ),
     (
-        "Buckets",
+        "help.buckets",
         &[
-            ("f", "Filter: welche Buckets angezeigt werden"),
-            (
-                "n / r / d",
-                "im Filter: Bucket anlegen / umbenennen / löschen",
-            ),
-            ("Space / x", "im Filter: an/aus (wirkt sofort)"),
-            ("o", "im Filter: nur dieser"),
-            ("a", "im Filter: alle an/aus"),
-            ("⏎ / Esc", "im Filter: speichern / verwerfen"),
-            ("", "genau ein Bucket aktiv → neue Tasks erben ihn"),
+            ("f", "help.buckets.filter"),
+            ("n / r / d", "help.buckets.manage"),
+            ("Space / x", "help.buckets.toggle"),
+            ("o", "help.buckets.only"),
+            ("a", "help.buckets.all"),
+            ("⏎ / Esc", "help.buckets.save"),
+            ("", "help.buckets.inherit"),
         ],
     ),
     (
-        "Allgemein",
+        "help.general",
         &[
-            ("s", "Sync mit Git-Remote"),
-            ("R", "neu laden"),
-            ("v", "Spalte „Erledigt“ ein-/ausblenden"),
-            (
-                "c",
-                "Kalender ein-/ausblenden (Anzahl fälliger Tasks je Tag)",
-            ),
-            ("t", "Theme wählen"),
-            ("?", "diese Hilfe"),
-            ("q / Esc", "beenden bzw. abbrechen"),
+            ("s", "help.general.sync"),
+            ("R", "help.general.reload"),
+            ("v", "help.general.done_column"),
+            ("c", "help.general.calendar"),
+            ("t", "help.general.theme"),
+            ("?", "help.general.help"),
+            ("q / Esc", "help.general.quit"),
         ],
     ),
     (
-        "Datumsangaben",
+        "help.dates",
         &[
-            ("2026-10-24", "ISO"),
-            ("24.10.", "nächstes Vorkommen, auch 24.10.2026"),
-            ("+3d +2w +1m", "relativ: Tage, Wochen, Monate"),
-            ("heute morgen", "auch übermorgen"),
-            ("mo … so", "nächster Wochentag (nicht heute)"),
+            ("2026-10-24", "help.dates.iso"),
+            ("24.10. 10/24", "help.dates.day_month"),
+            ("+3d +2w +1m", "help.dates.relative"),
+            ("today tomorrow", "help.dates.words"),
+            ("mon … sun", "help.dates.weekdays"),
         ],
     ),
 ];
@@ -155,23 +151,26 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
 fn draw_header(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
     let today = dates::today();
-    let mut parts = vec![format!("{} offen", app.board.open_count())];
+    let mut parts = vec![t!("hdr.open", n = app.board.open_count()).into_owned()];
     let overdue = app.board.overdue_count(today);
     if overdue > 0 {
-        parts.push(format!("{overdue} überfällig"));
+        parts.push(t!("hdr.overdue", n = overdue).into_owned());
     }
     if !app.show_done {
         let last = &app.board.columns[app.board.last_index()];
-        parts.push(format!(
-            "{} {} ausgeblendet",
-            last.tasks.len(),
-            last.def.name
-        ));
+        parts.push(
+            t!(
+                "hdr.done_hidden",
+                n = last.tasks.len(),
+                name = last.def.name
+            )
+            .into_owned(),
+        );
     }
     let filter = app.board.filter_label().map(|label| {
         let mut s = format!("⧩ {label}");
         if app.board.hidden > 0 {
-            s.push_str(&format!(" · {} ausgeblendet", app.board.hidden));
+            s.push_str(&format!(" · {}", t!("hdr.hidden", n = app.board.hidden)));
         }
         s
     });
@@ -257,7 +256,7 @@ fn draw_column(
     }
     title.push(Span::styled(column.def.name.clone(), title_style));
     let counter = if active && len > 0 {
-        format!("{} von {}", row + 1, len)
+        t!("col.position", n = row + 1, total = len).into_owned()
     } else {
         len.to_string()
     };
@@ -278,7 +277,10 @@ fn draw_column(
 
     if len == 0 {
         f.render_widget(
-            Paragraph::new(Span::styled("  (leer)", Style::new().fg(c.dim))),
+            Paragraph::new(Span::styled(
+                format!("  {}", t!("col.empty")),
+                Style::new().fg(c.dim),
+            )),
             inner,
         );
         return;
@@ -444,8 +446,8 @@ fn draw_status(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
     if let Mode::Input { kind, input } = &app.mode {
         let label = format!(" {}: ", kind.label());
         let hint = match kind {
-            super::app::InputKind::Due => "  leer = entfernen",
-            super::app::InputKind::Rename => "",
+            super::app::InputKind::Due => t!("input.due_hint"),
+            super::app::InputKind::Rename => "".into(),
         };
         let line = Line::from(vec![
             Span::styled(label.clone(), Style::new().fg(c.key).bold()),
@@ -477,7 +479,7 @@ fn draw_status(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
         let n = app.warnings().count();
         if n > 0 {
             Line::from(Span::styled(
-                format!(" ⚠ {n} Warnung(en) – ? zeigt Details"),
+                format!(" ⚠ {}", t!("status.warnings", n = n)),
                 Style::new().fg(c.warn),
             ))
         } else {
@@ -493,79 +495,92 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
     let keys: Vec<(&str, &str)> = match &app.mode {
         Mode::Normal => {
             let mut k = vec![
-                ("h/l", "Spalte"),
-                ("j/k", "Karte"),
-                ("H/L", "verschieben"),
-                ("n", "neu"),
-                ("e", "bearbeiten"),
-                ("E", "Editor"),
-                ("x", "erledigt"),
-                ("⏎", "Details"),
+                ("h/l", "kb.column"),
+                ("j/k", "kb.card"),
+                ("H/L", "kb.move"),
+                ("n", "kb.new"),
+                ("e", "kb.edit"),
+                ("E", "kb.editor"),
+                ("x", "kb.done"),
+                ("⏎", "kb.details"),
             ];
-            k.push(("f", if has_buckets { "Filter" } else { "Buckets" }));
+            k.push((
+                "f",
+                if has_buckets {
+                    "kb.filter"
+                } else {
+                    "kb.buckets"
+                },
+            ));
             if has_buckets {
-                k.push(("b", "Bucket"));
+                k.push(("b", "kb.bucket"));
             }
-            k.push(("v", "Erledigt ein/aus"));
-            k.push(("c", "Kalender"));
-            k.extend([("s", "Sync"), ("t", "Theme"), ("?", "Hilfe"), ("q", "Ende")]);
+            k.push(("v", "kb.toggle_done"));
+            k.push(("c", "kb.calendar"));
+            k.extend([
+                ("s", "kb.sync"),
+                ("t", "kb.theme"),
+                ("?", "kb.help"),
+                ("q", "kb.quit"),
+            ]);
             k
         }
-        Mode::Input { .. } => vec![("⏎", "speichern"), ("Esc", "abbrechen"), ("^U", "leeren")],
+        Mode::Input { .. } => vec![("⏎", "kb.save"), ("Esc", "kb.cancel"), ("^U", "kb.clear")],
         Mode::Form(form) => {
-            let mut k = vec![("Tab/↓", "nächstes Feld"), ("⇧Tab/↑", "voriges")];
+            let mut k = vec![("Tab/↓", "kb.next_field"), ("⇧Tab/↑", "kb.prev_field")];
             if !form.focused().is_text() {
-                k.push(("←/→", "ändern"));
+                k.push(("←/→", "kb.change"));
             }
-            k.extend([("⏎", "speichern"), ("Esc", "verwerfen")]);
+            k.extend([("⏎", "kb.save"), ("Esc", "kb.discard")]);
             k
         }
-        Mode::ConfirmDelete => vec![("j", "löschen"), ("n/Esc", "abbrechen")],
-        Mode::Help { .. } => vec![("j/k", "scrollen"), ("Esc", "schließen")],
+        Mode::ConfirmDelete => vec![("y/j", "kb.delete"), ("n/Esc", "kb.cancel")],
+        Mode::Help { .. } => vec![("j/k", "kb.scroll"), ("Esc", "kb.close")],
         Mode::Themes { .. } => vec![
-            ("j/k", "auswählen"),
-            ("⏎", "übernehmen"),
-            ("Esc", "abbrechen"),
+            ("j/k", "kb.select"),
+            ("⏎", "kb.apply"),
+            ("Esc", "kb.cancel"),
         ],
         Mode::Detail { .. } => vec![
-            ("j/k", "scrollen"),
-            ("e", "bearbeiten"),
-            ("E", "Editor"),
-            ("Esc", "schließen"),
+            ("j/k", "kb.scroll"),
+            ("e", "kb.edit"),
+            ("E", "kb.editor"),
+            ("Esc", "kb.close"),
         ],
         Mode::Filter { .. } => vec![
-            ("j/k", "auswählen"),
-            ("Space", "an/aus"),
-            ("o", "nur dieser"),
-            ("a", "alle"),
-            ("n", "neuer Bucket"),
-            ("r", "umbenennen"),
-            ("d", "löschen"),
-            ("⏎", "speichern"),
-            ("Esc", "verwerfen"),
+            ("j/k", "kb.select"),
+            ("Space", "kb.toggle"),
+            ("o", "kb.only"),
+            ("a", "kb.all"),
+            ("n", "kb.new_bucket"),
+            ("r", "kb.rename"),
+            ("d", "kb.delete"),
+            ("⏎", "kb.save"),
+            ("Esc", "kb.discard"),
         ],
-        Mode::BucketNew { .. } => vec![("Tab", "Name/Key"), ("⏎", "anlegen"), ("Esc", "abbrechen")],
-        Mode::BucketRename { .. } => vec![("⏎", "speichern"), ("Esc", "abbrechen")],
+        Mode::BucketNew { .. } => vec![
+            ("Tab", "kb.name_key"),
+            ("⏎", "kb.create"),
+            ("Esc", "kb.cancel"),
+        ],
+        Mode::BucketRename { .. } => vec![("⏎", "kb.save"), ("Esc", "kb.cancel")],
         Mode::BucketDelete { .. } | Mode::BucketMove { .. } => {
-            vec![
-                ("j/k", "auswählen"),
-                ("⏎", "ausführen"),
-                ("Esc", "abbrechen"),
-            ]
+            vec![("j/k", "kb.select"), ("⏎", "kb.run"), ("Esc", "kb.cancel")]
         }
         Mode::PickBucket { .. } => {
-            vec![("j/k", "auswählen"), ("⏎", "setzen"), ("Esc", "abbrechen")]
+            vec![("j/k", "kb.select"), ("⏎", "kb.set"), ("Esc", "kb.cancel")]
         }
     };
     let mut lines = vec![vec![Span::raw(" ")]];
     let mut used = 1;
     for (k, label) in keys {
+        let label = t!(label);
         let item_width = k.width() + label.width() + 6;
         if used + item_width > width as usize && used > 1 && lines.len() < 2 {
             lines.push(vec![Span::raw(" ")]);
             used = 1;
         }
-        let line = lines.last_mut().expect("mindestens eine Zeile");
+        let line = lines.last_mut().expect("at least one line");
         line.push(Span::styled("[", Style::new().fg(c.dim)));
         line.push(Span::styled(k.to_string(), Style::new().fg(c.key)));
         line.push(Span::styled(format!(" → {label}]"), Style::new().fg(c.dim)));
@@ -603,13 +618,13 @@ fn draw_help(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
     let mut lines = vec![];
     for (section, keys) in HELP {
         lines.push(Line::from(Span::styled(
-            *section,
+            t!(*section).into_owned(),
             Style::new().fg(c.title).bold(),
         )));
         for (k, text) in *keys {
             lines.push(Line::from(vec![
-                Span::styled(format!("  {k:<14}"), Style::new().fg(c.key)),
-                Span::raw(*text),
+                Span::styled(format!("  {k:<16}"), Style::new().fg(c.key)),
+                Span::raw(t!(*text).into_owned()),
             ]));
         }
         lines.push(Line::default());
@@ -617,7 +632,7 @@ fn draw_help(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
     let warnings: Vec<_> = app.warnings().collect();
     if !warnings.is_empty() {
         lines.push(Line::from(Span::styled(
-            "Warnungen",
+            t!("help.warnings").into_owned(),
             Style::new().fg(c.warn).bold(),
         )));
         for w in warnings {
@@ -627,7 +642,7 @@ fn draw_help(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
             )));
         }
     }
-    let inner = popup(f, c, "Hilfe", 72, lines.len() as u16 + 2);
+    let inner = popup(f, c, &t!("help.title"), 72, lines.len() as u16 + 2);
     f.render_widget(
         Paragraph::new(lines)
             .wrap(Wrap { trim: false })
@@ -671,7 +686,7 @@ fn draw_themes(f: &mut Frame, app: &App, c: &Palette, idx: usize) {
             Line::from(spans)
         })
         .collect();
-    let inner = popup(f, c, "Theme", 36, lines.len() as u16 + 2);
+    let inner = popup(f, c, &t!("theme.title"), 36, lines.len() as u16 + 2);
     f.render_widget(Paragraph::new(lines), inner);
 }
 
@@ -686,7 +701,7 @@ fn draw_detail(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
         .map_or(t.status.as_str(), |col| col.def.name.as_str());
     let field = |k: &str, v: String| {
         Line::from(vec![
-            Span::styled(format!("{k:<12}"), Style::new().fg(c.dim)),
+            Span::styled(format!("{k:<14}"), Style::new().fg(c.dim)),
             Span::raw(v),
         ])
     };
@@ -697,28 +712,28 @@ fn draw_detail(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
         )),
         Line::default(),
         field("ID", t.id.clone()),
-        field("Status", column.to_string()),
-        field("Prio", format!("P{}", t.prio_or_default())),
+        field(&t!("detail.status"), column.to_string()),
+        field(&t!("detail.prio"), format!("P{}", t.prio_or_default())),
     ];
     if let Some(b) = &t.bucket {
         lines.push(field(
-            "Bucket",
+            &t!("detail.bucket"),
             format!("{} (@{b})", app.board.bucket_name(b)),
         ));
     }
     if let Some(d) = t.due {
         lines.push(field(
-            "Fällig",
-            format!("{} ({})", d.strftime("%d.%m.%Y"), dates::fmt_due(d, today)),
+            &t!("detail.due"),
+            format!("{} ({})", dates::fmt_date(d), dates::fmt_due(d, today)),
         ));
     }
     for (k, v) in [
-        ("Erstellt", t.created),
-        ("Verschoben", t.moved),
-        ("Erledigt", t.done),
+        (t!("detail.created"), t.created),
+        (t!("detail.moved"), t.moved),
+        (t!("detail.done"), t.done),
     ] {
         if let Some(ts) = v {
-            lines.push(field(k, dates::fmt_timestamp(ts)));
+            lines.push(field(&k, dates::fmt_timestamp(ts)));
         }
     }
     if !t.note().is_empty() {
@@ -733,7 +748,7 @@ fn draw_detail(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
         }
     }
     let height = (lines.len() as u16 + 2).max(10);
-    let inner = popup(f, c, "Details", 72, height);
+    let inner = popup(f, c, &t!("detail.title"), 72, height);
     f.render_widget(
         Paragraph::new(lines)
             .wrap(Wrap { trim: false })
@@ -744,15 +759,18 @@ fn draw_detail(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
 
 fn draw_confirm(f: &mut Frame, app: &App, c: &Palette) {
     let Some(t) = app.selected() else { return };
-    let inner = popup(f, c, "Löschen?", 50, 5);
+    let inner = popup(f, c, &t!("delete.title"), 50, 5);
     let lines = vec![
         Line::from(truncate(&t.title, inner.width as usize)),
         Line::default(),
         Line::from(vec![
-            Span::styled("j", Style::new().fg(c.overdue).bold()),
-            Span::raw(" löschen   "),
+            Span::styled(
+                t!("kb.yes_key").into_owned(),
+                Style::new().fg(c.overdue).bold(),
+            ),
+            Span::raw(format!(" {}   ", t!("kb.delete"))),
             Span::styled("n", Style::new().fg(c.key)),
-            Span::raw(" abbrechen"),
+            Span::raw(format!(" {}", t!("kb.cancel"))),
         ]),
     ];
     f.render_widget(Paragraph::new(lines), inner);
@@ -789,8 +807,8 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
     const LABEL: usize = 10;
     let today = dates::today();
     let title = match &form.editing {
-        None => "Neuer Task".to_string(),
-        Some(id) => format!("Task bearbeiten · {id}"),
+        None => t!("form.title_new").into_owned(),
+        Some(id) => t!("form.title_edit", id = id).into_owned(),
     };
     // Title, hint line, remaining fields, border
     let inner = popup(f, c, &title, 70, form.fields.len() as u16 + 3);
@@ -800,7 +818,10 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
     // Title tokens override the fields on save – show that next to each field.
     let tokens = crate::quickadd::parse_str(&form.title.text, today).ok();
     let overrides = |c: &Palette, text: String| {
-        Span::styled(format!("  ← Titel: {text}"), Style::new().fg(c.accent))
+        Span::styled(
+            format!("  ← {}", t!("form.from_title", value = text)),
+            Style::new().fg(c.accent),
+        )
     };
 
     let choice = |text: String, style: Style, focused: bool| -> Vec<Span<'static>> {
@@ -840,20 +861,22 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
             Field::Due => {
                 let from_title = tokens.as_ref().and_then(|q| q.due);
                 let preview = if let Some(d) = from_title {
-                    overrides(c, d.strftime("%d.%m.%Y").to_string())
+                    overrides(c, dates::fmt_date(d))
                 } else if form.due.text.trim().is_empty() {
-                    Span::styled("  leer = keine Fälligkeit", Style::new().fg(c.dim))
+                    Span::styled(
+                        format!("  {}", t!("form.due_empty")),
+                        Style::new().fg(c.dim),
+                    )
                 } else {
                     match dates::parse_date(&form.due.text, today) {
                         Ok(d) => Span::styled(
-                            format!(
-                                "  → {} ({})",
-                                d.strftime("%d.%m.%Y"),
-                                dates::fmt_due(d, today)
-                            ),
+                            format!("  → {} ({})", dates::fmt_date(d), dates::fmt_due(d, today)),
                             Style::new().fg(c.accent),
                         ),
-                        Err(_) => Span::styled("  ✗ unbekanntes Datum", Style::new().fg(c.overdue)),
+                        Err(_) => Span::styled(
+                            format!("  ✗ {}", t!("form.due_unknown")),
+                            Style::new().fg(c.overdue),
+                        ),
                     }
                 };
                 let w = value_width.saturating_sub(preview.width()).max(8);
@@ -864,7 +887,7 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
             }
             Field::Note if form.note_editable => text_field(&form.note, &mut spans, value_width),
             Field::Note => spans.push(Span::styled(
-                "mehrzeilig – im Editor bearbeiten (E)",
+                t!("form.note_multiline").into_owned(),
                 Style::new().fg(c.dim),
             )),
             Field::Status => spans.extend(choice(
@@ -879,7 +902,7 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
                     _ => Style::new().fg(c.fg),
                 };
                 spans.extend(choice(
-                    format!("P{} {}", form.prio, PRIO_NAMES[form.prio as usize - 1]),
+                    format!("P{} {}", form.prio, prio_name(form.prio)),
                     style,
                     focused,
                 ));
@@ -893,12 +916,12 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
                 } else {
                     Style::new().fg(c.key).bold()
                 };
-                spans.extend(choice(form.bucket_label().to_string(), style, focused));
+                spans.extend(choice(form.bucket_label(), style, focused));
                 if let Some(b) = tokens.as_ref().and_then(|q| q.bucket.as_ref()) {
                     spans.push(overrides(c, format!("@{b}")));
                 } else if form.inherited {
                     spans.push(Span::styled(
-                        "  aus Filter übernommen",
+                        format!("  {}", t!("form.from_filter")),
                         Style::new().fg(c.key),
                     ));
                 }
@@ -932,10 +955,7 @@ fn title_hint(
     if !has_token {
         return Line::from(vec![
             pad,
-            Span::styled(
-                "P1–P3 · due:fr · @bucket im Titel gehen auch",
-                Style::new().fg(c.dim),
-            ),
+            Span::styled(t!("form.tokens_hint").into_owned(), Style::new().fg(c.dim)),
         ]);
     }
     let q = match crate::quickadd::parse_str(text, today) {
@@ -968,7 +988,7 @@ fn title_hint(
     Line::from(vec![
         pad,
         Span::styled(
-            format!("erkannt: {}", parts.join(" · ")),
+            t!("form.recognized", parts = parts.join(" · ")).into_owned(),
             Style::new().fg(c.accent),
         ),
     ])
@@ -976,7 +996,7 @@ fn title_hint(
 
 fn draw_filter(f: &mut Frame, app: &App, c: &Palette, idx: usize, checked: &[bool]) {
     let mut names: Vec<String> = app.board.buckets.iter().map(|b| b.name.clone()).collect();
-    names.push("(ohne Bucket)".into());
+    names.push(format!("({})", t!("bucket.none")));
     let lines: Vec<Line> = names
         .iter()
         .enumerate()
@@ -1012,12 +1032,12 @@ fn draw_filter(f: &mut Frame, app: &App, c: &Palette, idx: usize, checked: &[boo
         lines.insert(
             0,
             Line::from(Span::styled(
-                "  noch keine Buckets – n legt einen an",
+                format!("  {}", t!("filter.no_buckets")),
                 Style::new().fg(c.dim),
             )),
         );
     }
-    let inner = popup(f, c, "Filter · Buckets", 42, lines.len() as u16 + 2);
+    let inner = popup(f, c, &t!("filter.title"), 42, lines.len() as u16 + 2);
     f.render_widget(Paragraph::new(lines), inner);
 }
 
@@ -1060,19 +1080,35 @@ fn row(area: Rect, n: u16) -> Position {
 }
 
 fn draw_bucket_new(f: &mut Frame, c: &Palette, name: &Input, key: &Input, focus_key: bool) {
-    let inner = popup(f, c, "Neuer Bucket", 48, 5);
+    let inner = popup(f, c, &t!("bucket.new_title"), 48, 5);
     let hint = if key.text.is_empty() {
         String::new()
     } else {
         format!("  → @{}", key.text)
     };
-    let (name_line, c1) = field_line(c, row(inner, 0), inner.width, "Name", name, !focus_key, "");
-    let (key_line, c2) = field_line(c, row(inner, 1), inner.width, "Key", key, focus_key, &hint);
+    let (name_line, c1) = field_line(
+        c,
+        row(inner, 0),
+        inner.width,
+        &t!("bucket.field_name"),
+        name,
+        !focus_key,
+        "",
+    );
+    let (key_line, c2) = field_line(
+        c,
+        row(inner, 1),
+        inner.width,
+        &t!("bucket.field_key"),
+        key,
+        focus_key,
+        &hint,
+    );
     let lines = vec![
         name_line,
         key_line,
         Line::from(Span::styled(
-            "  Key steht in den Task-Dateien, a–z 0–9 - _",
+            format!("  {}", t!("bucket.key_hint")),
             Style::new().fg(c.dim),
         )),
     ];
@@ -1083,12 +1119,20 @@ fn draw_bucket_new(f: &mut Frame, c: &Palette, name: &Input, key: &Input, focus_
 }
 
 fn draw_bucket_rename(f: &mut Frame, c: &Palette, key: &str, input: &Input) {
-    let inner = popup(f, c, &format!("Bucket umbenennen · @{key}"), 48, 4);
-    let (line, cursor) = field_line(c, row(inner, 0), inner.width, "Name", input, true, "");
+    let inner = popup(f, c, &t!("bucket.rename_title", key = key), 48, 4);
+    let (line, cursor) = field_line(
+        c,
+        row(inner, 0),
+        inner.width,
+        &t!("bucket.field_name"),
+        input,
+        true,
+        "",
+    );
     let lines = vec![
         line,
         Line::from(Span::styled(
-            "  nur der Anzeigename, Tasks bleiben unverändert",
+            format!("  {}", t!("bucket.rename_hint")),
             Style::new().fg(c.dim),
         )),
     ];
@@ -1110,9 +1154,15 @@ fn draw_bucket_delete(
     let name = app.board.bucket_name(key).to_string();
     let choices = app.delete_choices(open, done);
     let summary = if open + done == 0 {
-        "Der Bucket ist leer.".to_string()
+        t!("bucket.delete_empty").into_owned()
     } else {
-        format!("{} Task(s): {open} offen, {done} erledigt", open + done)
+        t!(
+            "bucket.delete_summary",
+            n = open + done,
+            open = open,
+            done = done
+        )
+        .into_owned()
     };
     let mut lines = vec![
         Line::from(Span::styled(summary, Style::new().fg(c.warn))),
@@ -1136,7 +1186,7 @@ fn draw_bucket_delete(
     let inner = popup(
         f,
         c,
-        &format!("Bucket „{name}“ löschen?"),
+        &t!("bucket.delete_title", name = name),
         56,
         lines.len() as u16 + 2,
     );
@@ -1166,16 +1216,13 @@ fn draw_bucket_move(f: &mut Frame, app: &App, c: &Palette, key: &str, idx: usize
             ])
         })
         .collect();
-    let title = format!(
-        "Tasks von „{}“ verschieben nach",
-        app.board.bucket_name(key)
-    );
+    let title = t!("bucket.move_title", name = app.board.bucket_name(key)).into_owned();
     let inner = popup(f, c, &title, 48, lines.len() as u16 + 2);
     f.render_widget(Paragraph::new(lines), inner);
 }
 
 fn draw_pick_bucket(f: &mut Frame, app: &App, c: &Palette, idx: usize) {
-    let mut names = vec!["(ohne Bucket)".to_string()];
+    let mut names = vec![format!("({})", t!("bucket.none"))];
     names.extend(
         app.board
             .buckets
@@ -1203,7 +1250,7 @@ fn draw_pick_bucket(f: &mut Frame, app: &App, c: &Palette, idx: usize) {
             ])
         })
         .collect();
-    let inner = popup(f, c, "Bucket", 32, lines.len() as u16 + 2);
+    let inner = popup(f, c, &t!("bucket.pick_title"), 32, lines.len() as u16 + 2);
     f.render_widget(Paragraph::new(lines), inner);
 }
 

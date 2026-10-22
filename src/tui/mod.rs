@@ -24,6 +24,7 @@ use app::App;
 const TICK: Duration = Duration::from_millis(500);
 
 pub fn run(store: Store, cfg: AppConfig, cfg_path: PathBuf) -> Result<()> {
+    crate::i18n::set(cfg.lang());
     let mut app = App::new(store, cfg, cfg_path)?;
     // ratatui::init also installs a panic hook that restores the terminal.
     let mut terminal = ratatui::init();

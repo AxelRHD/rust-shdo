@@ -6,42 +6,46 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use jiff::Zoned;
 
+use rust_i18n::t;
+
+use crate::i18n::{self, Lang};
 use crate::task::Task;
 
 pub const BOARD_FILE: &str = "shdo.toml";
 const ID_CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
 
-pub const DEFAULT_BOARD: &str = r#"# Status der Tasks, je einer als Spalte im Board. Der erste gilt für neue Tasks,
-# der letzte als „erledigt“. Der key steht in den Task-Dateien,
-# der name ist nur die Anzeige und darf jederzeit geändert werden.
-
-[[status]]
-key = "todo"
-name = "Offen"
-
-[[status]]
-key = "doing"
-name = "In Arbeit"
-
-[[status]]
-key = "wait"
-name = "Wartet"
-
-[[status]]
-key = "done"
-name = "Erledigt"
-
-# Optionale Buckets, z. B. Privat/Arbeit. Jeder Task liegt in höchstens einem.
-# Welche Buckets angezeigt werden, wählt jeder Rechner selbst (Taste f).
-#
-# [[buckets]]
-# key = "home"
-# name = "Privat"
-#
-# [[buckets]]
-# key = "work"
-# name = "Arbeit"
-"#;
+/// Initial `shdo.toml`: English comments, status names in the given language.
+pub fn default_board(lang: Lang) -> String {
+    let l = lang.code();
+    let status = |key: &str, name_key: &str| {
+        format!(
+            "[[status]]\nkey = \"{key}\"\nname = \"{}\"\n",
+            t!(name_key, locale = l)
+        )
+    };
+    format!(
+        "# Task statuses, each shown as a board column. New tasks get the first one,\n\
+         # the last one counts as done. The key is stored in task files, the name is\n\
+         # only displayed and can be changed at any time.\n\n\
+         {}\n{}\n{}\n{}\n\
+         # Optional buckets, e.g. home/work. Each task is in at most one bucket.\n\
+         # Each machine picks which buckets it shows (key f in the board).\n\
+         #\n\
+         # [[buckets]]\n\
+         # key = \"home\"\n\
+         # name = \"{}\"\n\
+         #\n\
+         # [[buckets]]\n\
+         # key = \"work\"\n\
+         # name = \"{}\"\n",
+        status("todo", "board.default.todo"),
+        status("doing", "board.default.doing"),
+        status("wait", "board.default.wait"),
+        status("done", "board.default.done"),
+        t!("board.default.home", locale = l),
+        t!("board.default.work", locale = l),
+    )
+}
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct StatusDef {
@@ -86,20 +90,19 @@ impl Store {
 
     pub fn ensure_initialized(&self) -> Result<()> {
         if !self.tasks_dir().is_dir() {
-            bail!(
-                "{} ist kein shdo-Verzeichnis – zuerst `shdo init` ausführen",
-                self.dir.display()
-            );
+            bail!(t!("store.not_initialized", path = self.dir.display()));
         }
         Ok(())
     }
 
     /// Creates the directory layout. Returns what was newly created.
-    pub fn init(&self) -> Result<Vec<String>> {
+    /// `lang` decides the status names written to a new `shdo.toml`.
+    pub fn init(&self, lang: Lang) -> Result<Vec<String>> {
         let mut created = Vec::new();
         for d in [self.dir.clone(), self.tasks_dir(), self.archive_dir()] {
             if !d.is_dir() {
-                fs::create_dir_all(&d).with_context(|| format!("{} anlegen", d.display()))?;
+                fs::create_dir_all(&d)
+                    .with_context(|| t!("io.create", path = d.display()).into_owned())?;
                 created.push(format!("{}/", d.display()));
             }
             // Git does not track empty directories.
@@ -110,7 +113,7 @@ impl Store {
         }
         let board = self.dir.join(BOARD_FILE);
         if !board.exists() {
-            fs::write(&board, DEFAULT_BOARD)?;
+            fs::write(&board, default_board(lang))?;
             created.push(board.display().to_string());
         }
         Ok(created)
@@ -121,28 +124,32 @@ impl Store {
         let path = self.dir.join(BOARD_FILE);
         let raw = match fs::read_to_string(&path) {
             Ok(raw) => raw,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => DEFAULT_BOARD.into(),
-            Err(e) => return Err(e).with_context(|| format!("{} lesen", path.display())),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => default_board(i18n::current()),
+            Err(e) => {
+                return Err(e).with_context(|| t!("io.read", path = path.display()).into_owned());
+            }
         };
-        parse_board(&raw).with_context(|| format!("{} ungültig", path.display()))
+        parse_board(&raw).with_context(|| t!("io.invalid", path = path.display()).into_owned())
     }
 
     fn board_doc(&self) -> Result<toml_edit::DocumentMut> {
         let path = self.dir.join(BOARD_FILE);
         let raw = match fs::read_to_string(&path) {
             Ok(raw) => raw,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => DEFAULT_BOARD.into(),
-            Err(e) => return Err(e).with_context(|| format!("{} lesen", path.display())),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => default_board(i18n::current()),
+            Err(e) => {
+                return Err(e).with_context(|| t!("io.read", path = path.display()).into_owned());
+            }
         };
         raw.parse()
-            .with_context(|| format!("{} ungültig", path.display()))
+            .with_context(|| t!("io.invalid", path = path.display()).into_owned())
     }
 
     fn save_board_doc(&self, doc: &toml_edit::DocumentMut) -> Result<()> {
         let raw = doc.to_string();
-        parse_board(&raw).context("Änderung würde shdo.toml ungültig machen")?;
+        parse_board(&raw).context(t!("store.change_invalid"))?;
         let path = self.dir.join(BOARD_FILE);
-        fs::write(&path, raw).with_context(|| format!("{} schreiben", path.display()))
+        fs::write(&path, raw).with_context(|| t!("io.write", path = path.display()).into_owned())
     }
 
     /// Appends a new bucket to `shdo.toml`; comments are preserved.
@@ -150,12 +157,12 @@ impl Store {
         let key = key.trim();
         let name = name.trim();
         if name.is_empty() {
-            bail!("Name fehlt");
+            bail!(t!("bucket.name_missing"));
         }
         validate_bucket_key(key)?;
         let cfg = self.board_config()?;
         if cfg.buckets.iter().any(|b| b.key == key) {
-            bail!("Bucket-key „{key}“ gibt es schon");
+            bail!(t!("bucket.key_exists", key = key));
         }
         let mut doc = self.board_doc()?;
         let mut table = toml_edit::Table::new();
@@ -179,12 +186,12 @@ impl Store {
     pub fn rename_bucket(&self, key: &str, name: &str) -> Result<()> {
         let name = name.trim();
         if name.is_empty() {
-            bail!("Name fehlt");
+            bail!(t!("bucket.name_missing"));
         }
         let mut doc = self.board_doc()?;
         let table = bucket_tables(&mut doc)
             .find(|t| t.get("key").and_then(|k| k.as_str()) == Some(key))
-            .with_context(|| format!("Bucket „{key}“ nicht gefunden"))?;
+            .with_context(|| t!("bucket.not_found", key = key).into_owned())?;
         table["name"] = toml_edit::value(name);
         self.save_board_doc(&doc)
     }
@@ -195,11 +202,11 @@ impl Store {
         let arr = doc
             .get_mut("buckets")
             .and_then(|i| i.as_array_of_tables_mut())
-            .with_context(|| format!("Bucket „{key}“ nicht gefunden"))?;
+            .with_context(|| t!("bucket.not_found", key = key).into_owned())?;
         let idx = arr
             .iter()
             .position(|t| t.get("key").and_then(|k| k.as_str()) == Some(key))
-            .with_context(|| format!("Bucket „{key}“ nicht gefunden"))?;
+            .with_context(|| t!("bucket.not_found", key = key).into_owned())?;
         arr.remove(idx);
         if arr.is_empty() {
             doc.remove("buckets");
@@ -262,7 +269,7 @@ impl Store {
     pub fn find(&self, prefix: &str) -> Result<Task> {
         let prefix = prefix.trim().to_lowercase();
         if prefix.is_empty() {
-            bail!("keine ID angegeben");
+            bail!(t!("id.missing"));
         }
         let matches: Vec<PathBuf> = md_files(&self.tasks_dir())?
             .into_iter()
@@ -273,27 +280,28 @@ impl Store {
             })
             .collect();
         match matches.as_slice() {
-            [] => bail!("kein Task mit ID „{prefix}“"),
+            [] => bail!(t!("id.not_found", id = prefix)),
             [one] => Task::load(one),
             many => {
                 let ids: Vec<_> = many
                     .iter()
                     .filter_map(|p| p.file_stem()?.to_str())
                     .collect();
-                bail!("ID „{prefix}“ ist nicht eindeutig: {}", ids.join(", "))
+                bail!(t!("id.ambiguous", id = prefix, ids = ids.join(", ")))
             }
         }
     }
 
     pub fn delete(&self, task: &Task) -> Result<()> {
-        fs::remove_file(&task.path).with_context(|| format!("{} löschen", task.path.display()))
+        fs::remove_file(&task.path)
+            .with_context(|| t!("io.delete", path = task.path.display()).into_owned())
     }
 
     pub fn archive(&self, task: &Task) -> Result<()> {
         let target = self.archive_dir().join(format!("{}.md", task.id));
         fs::create_dir_all(self.archive_dir())?;
         fs::rename(&task.path, &target)
-            .with_context(|| format!("{} archivieren", task.path.display()))
+            .with_context(|| t!("io.archive", path = task.path.display()).into_owned())
     }
 
     /// Fingerprint of `tasks/` and `shdo.toml` to detect external changes.
@@ -321,12 +329,12 @@ pub fn parse_board(raw: &str) -> Result<BoardConfig> {
     let file: BoardFile = toml::from_str(raw)?;
     let statuses = match file.status {
         Some(c) => c,
-        None => toml::from_str::<BoardFile>(DEFAULT_BOARD)?
+        None => toml::from_str::<BoardFile>(&default_board(i18n::current()))?
             .status
-            .expect("Default hat Status"),
+            .expect("default board has statuses"),
     };
     if statuses.is_empty() {
-        bail!("mindestens ein Status nötig");
+        bail!(t!("board.status_required"));
     }
     validate_keys(&statuses, "Status")?;
     validate_keys(&file.buckets, "Bucket")?;
@@ -335,7 +343,7 @@ pub fn parse_board(raw: &str) -> Result<BoardConfig> {
         .iter()
         .find(|b| b.key == crate::board::NO_BUCKET)
     {
-        bail!("Bucket-key „{}“ ist reserviert", b.key);
+        bail!(t!("bucket.key_reserved", key = b.key));
     }
     Ok(BoardConfig {
         statuses,
@@ -346,10 +354,10 @@ pub fn parse_board(raw: &str) -> Result<BoardConfig> {
 fn validate_keys(defs: &[StatusDef], what: &str) -> Result<()> {
     for (i, c) in defs.iter().enumerate() {
         if c.key.trim().is_empty() {
-            bail!("{what} {} hat keinen key", i + 1);
+            bail!(t!("board.key_missing", what = what, n = i + 1));
         }
         if defs[..i].iter().any(|o| o.key == c.key) {
-            bail!("{what}-key „{}“ ist doppelt", c.key);
+            bail!(t!("board.key_duplicate", what = what, key = c.key));
         }
     }
     Ok(())
@@ -366,16 +374,16 @@ fn bucket_tables(doc: &mut toml_edit::DocumentMut) -> impl Iterator<Item = &mut 
 
 fn validate_bucket_key(key: &str) -> Result<()> {
     if key.is_empty() {
-        bail!("key fehlt");
+        bail!(t!("bucket.key_missing"));
     }
     if key == crate::board::NO_BUCKET {
-        bail!("„{key}“ ist reserviert");
+        bail!(t!("bucket.key_reserved", key = key));
     }
     if !key
         .chars()
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
     {
-        bail!("key „{key}“: nur a–z, 0–9, - und _ (wird als @{key} getippt)");
+        bail!(t!("bucket.key_chars", key = key));
     }
     Ok(())
 }
@@ -424,7 +432,7 @@ fn md_files(dir: &Path) -> Result<Vec<PathBuf>> {
     let entries = match fs::read_dir(dir) {
         Ok(e) => e,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(e) => return Err(e).with_context(|| format!("{} lesen", dir.display())),
+        Err(e) => return Err(e).with_context(|| t!("io.read", path = dir.display()).into_owned()),
     };
     let mut files: Vec<PathBuf> = entries
         .filter_map(|e| e.ok().map(|e| e.path()))
@@ -441,14 +449,14 @@ mod tests {
     fn store() -> (tempfile::TempDir, Store) {
         let tmp = tempfile::tempdir().unwrap();
         let s = Store::new(tmp.path().join("tasks-repo"));
-        s.init().unwrap();
+        s.init(Lang::De).unwrap();
         (tmp, s)
     }
 
     #[test]
     fn init_is_idempotent_and_has_default_statuses() {
         let (_tmp, s) = store();
-        assert!(s.init().unwrap().is_empty());
+        assert!(s.init(Lang::De).unwrap().is_empty());
         let cfg = s.board_config().unwrap();
         assert!(cfg.buckets.is_empty());
         let keys: Vec<_> = cfg.statuses.iter().map(|c| c.key.as_str()).collect();
@@ -495,7 +503,7 @@ mod tests {
         assert!(s.remove_bucket("work").is_err());
         assert!(s.board_config().unwrap().buckets.is_empty());
         let raw = fs::read_to_string(s.dir.join(BOARD_FILE)).unwrap();
-        assert!(raw.contains("# Optionale Buckets"), "{raw}");
+        assert!(raw.contains("# Optional buckets"), "{raw}");
     }
 
     #[test]
@@ -532,7 +540,7 @@ mod tests {
             t.save().unwrap();
         }
         let err = s.find("ab").unwrap_err().to_string();
-        assert!(err.contains("nicht eindeutig"), "{err}");
+        assert!(err.contains("ambiguous"), "{err}");
         assert_eq!(s.find("ab3").unwrap().id, "ab34");
     }
 

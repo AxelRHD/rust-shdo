@@ -4,6 +4,7 @@ mod config;
 mod dates;
 mod git;
 mod holidays;
+mod i18n;
 mod quickadd;
 mod store;
 mod task;
@@ -16,6 +17,9 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use clap::{CommandFactory, Parser, Subcommand};
+use rust_i18n::t;
+
+rust_i18n::i18n!("locales", fallback = "en");
 
 use board::{Board, Filter};
 use config::AppConfig;
@@ -26,14 +30,14 @@ use store::Store;
     name = "shdo",
     version,
     disable_help_subcommand = true,
-    about = "Kanban-Board fürs Terminal – Tasks als Markdown-Dateien in einem Git-Repo",
-    after_help = "Ohne Argumente öffnet sich das Board.\n\
-                  Neuer Task: shdo Rechnung bezahlen P1 due:fr\n\
-                  Beginnt der Titel mit einem Befehl: shdo -- ls reparieren"
+    about = "A kanban board for the terminal – tasks are Markdown files in a git repository",
+    after_help = "Without arguments the board opens.\n\
+                  New task: shdo Pay invoice P1 due:fri @work\n\
+                  Title starting with a command name: shdo -- ls fix"
 )]
 struct Cli {
-    /// Data directory (instead of `dir` from the config or ~/tasks)
-    #[arg(long, global = true, value_name = "PFAD")]
+    /// Data directory (instead of `dir` from the config or ~/.local/share/shdo)
+    #[arg(long, global = true, value_name = "PATH")]
     dir: Option<PathBuf>,
 
     #[command(subcommand)]
@@ -102,12 +106,14 @@ const SUBCOMMANDS: &[&str] = &[
 
 fn main() {
     if let Err(e) = run() {
-        eprintln!("Fehler: {e:#}");
+        eprintln!("error: {e:#}");
         std::process::exit(1);
     }
 }
 
 fn run() -> Result<()> {
+    // The CLI is always English; the TUI switches to the configured language.
+    i18n::set(i18n::Lang::En);
     let cli = Cli::parse_from(rewrite_dashdash(std::env::args().collect()));
     let cfg_path = config::config_path();
     let cfg = AppConfig::load(&cfg_path)?;
@@ -165,7 +171,7 @@ fn run() -> Result<()> {
             task.save()?;
             match key {
                 Some(k) => println!("{}  {}  @{k}", task.id, task.title),
-                None => println!("{}  {}  ohne Bucket", task.id, task.title),
+                None => println!("{}  {}  no bucket", task.id, task.title),
             }
             Ok(())
         }
@@ -178,7 +184,7 @@ fn run() -> Result<()> {
             let target = board.resolve_status(&status).with_context(|| {
                 let names: Vec<_> = board.columns.iter().map(|c| c.def.key.as_str()).collect();
                 format!(
-                    "unbekannter Status „{status}“ (vorhanden: {})",
+                    "unknown status \"{status}\" (available: {})",
                     names.join(", ")
                 )
             })?;
@@ -187,14 +193,14 @@ fn run() -> Result<()> {
         Cmd::Rm { id } => {
             let task = store.find(&id)?;
             store.delete(&task)?;
-            println!("gelöscht {}  {}", task.id, task.title);
+            println!("deleted  {}  {}", task.id, task.title);
             Ok(())
         }
         Cmd::Edit { id } => {
             let task = store.find(&id)?;
             open_editor(&cfg.editor(), &task.path)?;
             if let Err(e) = task::Task::load(&task.path) {
-                eprintln!("Warnung: {} ist jetzt ungültig: {e:#}", task.path.display());
+                eprintln!("warning: {} is now invalid: {e:#}", task.path.display());
             }
             Ok(())
         }
@@ -209,13 +215,13 @@ fn run() -> Result<()> {
                 store.archive(t)?;
             }
             println!(
-                "{} Task(s) aus „{}“ archiviert",
+                "archived {} task(s) from \"{}\"",
                 last.tasks.len(),
                 last.def.name
             );
             Ok(())
         }
-        Cmd::Init => init(&store),
+        Cmd::Init => init(&store, cfg.lang()),
         // already handled before the initialization check
         Cmd::Completions { .. } | Cmd::Complete { .. } => Ok(()),
     }
@@ -244,9 +250,9 @@ fn guard_typo(text: &[String]) -> Result<()> {
     let w = word.to_lowercase();
     if let Some(cmd) = SUBCOMMANDS.iter().find(|c| osa_distance(&w, c) <= 1) {
         bail!(
-            "„{word}“ sieht aus wie der Befehl `{cmd}`.\n\
-             Als Task anlegen: shdo add {word}\n\
-             Hilfe: shdo --help"
+            "\"{word}\" looks like the command `{cmd}`.\n\
+             To create a task instead: shdo add {word}\n\
+             Help: shdo --help"
         );
     }
     Ok(())
@@ -288,7 +294,7 @@ fn add(store: &Store, filter: &Filter, text: &[String]) -> Result<()> {
     task.set_bucket(bucket.as_deref());
     task.save()?;
     match (&bucket, inherited) {
-        (Some(b), true) => println!("{}  {}  @{b} (aus Filter)", task.id, task.title),
+        (Some(b), true) => println!("{}  {}  @{b} (from filter)", task.id, task.title),
         (Some(b), false) => println!("{}  {}  @{b}", task.id, task.title),
         (None, _) => println!("{}  {}", task.id, task.title),
     }
@@ -321,7 +327,7 @@ fn ls(store: &Store, filter: &Filter) -> Result<()> {
             paint(
                 "33",
                 &format!(
-                    "Filter: {label} · {} ausgeblendet (alle: shdo ls -a)",
+                    "filter: {label} · {} hidden (all: shdo ls -a)",
                     board.hidden
                 )
             )
@@ -371,21 +377,21 @@ fn ls(store: &Store, filter: &Filter) -> Result<()> {
         }
     }
     for w in &board.warnings {
-        eprintln!("{} {w}", paint("33", "Warnung:"));
+        eprintln!("{} {w}", paint("33", "warning:"));
     }
     Ok(())
 }
 
-fn init(store: &Store) -> Result<()> {
-    for c in store.init()? {
-        println!("angelegt  {c}");
+fn init(store: &Store, lang: i18n::Lang) -> Result<()> {
+    for c in store.init(lang)? {
+        println!("created   {c}");
     }
     let git = git::Git::new(&store.dir, false);
     if !git.is_repo() {
         git.init()?;
         println!("git init  {}", store.dir.display());
     }
-    println!("bereit: {}", store.dir.display());
+    println!("ready: {}", store.dir.display());
     Ok(())
 }
 
@@ -396,9 +402,9 @@ pub fn open_editor(editor: &str, path: &std::path::Path) -> Result<()> {
         .args(parts)
         .arg(path)
         .status()
-        .with_context(|| format!("Editor „{bin}“ konnte nicht gestartet werden"))?;
+        .with_context(|| t!("editor.start_failed", editor = bin).into_owned())?;
     if !status.success() {
-        bail!("Editor beendet mit {status}");
+        bail!(t!("editor.failed", status = status.to_string()));
     }
     Ok(())
 }

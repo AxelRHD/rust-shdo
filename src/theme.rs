@@ -7,6 +7,7 @@ use std::str::FromStr;
 
 use anyhow::{Context, Result, anyhow};
 use ratatui::style::Color;
+use rust_i18n::t;
 
 pub const DEFAULT_THEME: &str = "tokyonight";
 
@@ -65,7 +66,7 @@ struct ThemeFile {
 }
 
 fn parse_color(s: &str) -> Result<Color> {
-    Color::from_str(s).map_err(|_| anyhow!("ungültige Farbe {s:?}"))
+    Color::from_str(s).map_err(|_| anyhow!(t!("theme.bad_color", color = s)))
 }
 
 impl Palette {
@@ -89,9 +90,10 @@ impl Palette {
                 "warn" => &mut self.warn,
                 "weekend" => &mut self.weekend,
                 "holiday" => &mut self.holiday,
-                other => return Err(anyhow!("unbekanntes Farb-Token „{other}“")),
+                other => return Err(anyhow!(t!("theme.unknown_token", token = other))),
             };
-            *slot = parse_color(val).with_context(|| format!("Token „{key}“"))?;
+            *slot =
+                parse_color(val).with_context(|| t!("theme.token", token = key).into_owned())?;
         }
         Ok(())
     }
@@ -122,8 +124,8 @@ fn fallback() -> Palette {
         .find(|(id, _)| *id == DEFAULT_THEME)
         .map(|(_, raw)| *raw)
         .expect("Default-Theme ist eingebaut");
-    let base: ThemeFile = toml::from_str(raw).expect("Default-Theme ist gültig");
-    p.apply(&base.colors).expect("Default-Theme ist gültig");
+    let base: ThemeFile = toml::from_str(raw).expect("default theme is valid");
+    p.apply(&base.colors).expect("default theme is valid");
     p
 }
 
@@ -143,7 +145,7 @@ fn parse_theme(id: &str, raw: &str) -> Result<Theme> {
 pub fn load_all(custom_dir: &Path) -> (Vec<Theme>, Vec<String>) {
     let mut themes: Vec<Theme> = BUILTIN
         .iter()
-        .map(|(id, raw)| parse_theme(id, raw).expect("eingebaute Themes sind gültig"))
+        .map(|(id, raw)| parse_theme(id, raw).expect("built-in themes are valid"))
         .collect();
     let mut warnings = Vec::new();
     let mut files: Vec<_> = std::fs::read_dir(custom_dir)
@@ -165,7 +167,10 @@ pub fn load_all(custom_dir: &Path) -> (Vec<Theme>, Vec<String>) {
                 Some(slot) => *slot = t,
                 None => themes.push(t),
             },
-            Err(e) => warnings.push(format!("Theme {}: {e:#}", path.display())),
+            Err(e) => warnings.push(format!(
+                "{}: {e:#}",
+                t!("theme.file", path = path.display())
+            )),
         }
     }
     themes.sort_by_key(|t| t.name.to_lowercase());

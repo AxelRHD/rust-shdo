@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 
 use anyhow::Result;
 use jiff::Zoned;
+use rust_i18n::t;
 
 use crate::store::{BoardConfig, BucketDef, StatusDef, Store, resolve_def};
 use crate::task::Task;
@@ -98,9 +99,12 @@ impl Board {
                 Some(i) => i,
                 None => {
                     if task.status.is_empty() {
-                        warnings.push(format!("{}: kein Status gesetzt", task.id));
+                        warnings.push(t!("warn.no_status", id = task.id).into_owned());
                     } else {
-                        warnings.push(format!("{}: unbekannter Status „{}“", task.id, task.status));
+                        warnings.push(
+                            t!("warn.unknown_status", id = task.id, status = task.status)
+                                .into_owned(),
+                        );
                     }
                     0
                 }
@@ -110,7 +114,8 @@ impl Board {
                 Some(b) => {
                     let i = cfg.buckets.iter().position(|d| &d.key == b);
                     if i.is_none() {
-                        warnings.push(format!("{}: unbekannter Bucket „{b}“", task.id));
+                        warnings
+                            .push(t!("warn.unknown_bucket", id = task.id, bucket = b).into_owned());
                     }
                     i
                 }
@@ -176,15 +181,15 @@ impl Board {
         if self.filter.is_all() {
             return None;
         }
-        let names: Vec<&str> = self
+        let names: Vec<String> = self
             .filter
             .buckets
             .iter()
             .map(|b| {
                 if b == NO_BUCKET {
-                    "ohne Bucket"
+                    t!("bucket.none").into_owned()
                 } else {
-                    self.bucket_name(b)
+                    self.bucket_name(b).to_string()
                 }
             })
             .collect();
@@ -218,16 +223,13 @@ pub fn bucket_for_new(
 pub fn resolve_bucket(buckets: &[BucketDef], raw: &str) -> Result<String> {
     let raw = raw.trim_start_matches('@');
     if buckets.is_empty() {
-        anyhow::bail!("keine Buckets definiert (siehe [[buckets]] in shdo.toml)");
+        anyhow::bail!(t!("bucket.none_defined"));
     }
     match resolve_def(buckets, raw) {
         Some(i) => Ok(buckets[i].key.clone()),
         None => {
             let keys: Vec<_> = buckets.iter().map(|b| b.key.as_str()).collect();
-            anyhow::bail!(
-                "unbekannter Bucket „{raw}“ (vorhanden: {})",
-                keys.join(", ")
-            )
+            anyhow::bail!(t!("bucket.unknown", bucket = raw, keys = keys.join(", ")))
         }
     }
 }
@@ -328,12 +330,12 @@ mod tests {
         assert_eq!(ids(&board.columns[0].tasks), ["odd"]);
         assert_eq!(ids(&board.columns[1].tasks), ["d"]);
         assert_eq!(board.warnings.len(), 1);
-        assert!(board.warnings[0].contains("„weg“"));
+        assert!(board.warnings[0].contains("weg"));
     }
 
     #[test]
     fn counts_and_resolve() {
-        let defs = parse_board("").unwrap();
+        let defs = parse_board(&crate::store::default_board(crate::i18n::Lang::De)).unwrap();
         let mut done = task("x", "due = 2020-01-01");
         done.status = "done".into();
         let board = Board::build(

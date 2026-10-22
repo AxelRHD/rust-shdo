@@ -1,0 +1,907 @@
+_version: 2
+
+# Dates -------------------------------------------------------------------
+date.empty:
+  en: empty date
+  de: leeres Datum
+date.invalid:
+  en: "invalid date \"%{input}\" (allowed: 2026-10-24, 10/24, 24.10., +3d, +2w, +1m, today, tomorrow, mon–sun)"
+  de: "ungültiges Datum „%{input}“ (erlaubt: 2026-10-24, 24.10., +3d, +2w, +1m, heute, morgen, mo–so)"
+date.today:
+  en: today
+  de: heute
+date.tomorrow:
+  en: tomorrow
+  de: morgen
+date.yesterday:
+  en: yesterday
+  de: gestern
+date.since_today:
+  en: since today
+  de: seit heute
+date.since_yesterday:
+  en: since yesterday
+  de: seit gestern
+date.since_days:
+  en: for %{n} days
+  de: seit %{n} Tagen
+date.days_ago:
+  en: "%{n} days ago"
+  de: vor %{n} Tagen
+date.wd.mon:
+  en: MON
+  de: MO
+date.wd.tue:
+  en: TUE
+  de: DI
+date.wd.wed:
+  en: WED
+  de: MI
+date.wd.thu:
+  en: THU
+  de: DO
+date.wd.fri:
+  en: FRI
+  de: FR
+date.wd.sat:
+  en: SAT
+  de: SA
+date.wd.sun:
+  en: SUN
+  de: SO
+
+# Editor ------------------------------------------------------------------
+editor.start_failed:
+  en: "could not start editor \"%{editor}\""
+  de: "Editor „%{editor}“ konnte nicht gestartet werden"
+editor.failed:
+  en: "editor exited with %{status}"
+  de: "Editor beendet mit %{status}"
+
+# Files -------------------------------------------------------------------
+io.read:
+  en: "reading %{path}"
+  de: "%{path} lesen"
+io.write:
+  en: "writing %{path}"
+  de: "%{path} schreiben"
+io.create:
+  en: "creating %{path}"
+  de: "%{path} anlegen"
+io.delete:
+  en: "deleting %{path}"
+  de: "%{path} löschen"
+io.archive:
+  en: "archiving %{path}"
+  de: "%{path} archivieren"
+io.invalid:
+  en: "%{path} is invalid"
+  de: "%{path} ist ungültig"
+
+# Store and board configuration ---------------------------------------------
+store.not_initialized:
+  en: "%{path} is not a shdo directory – run `shdo init` first"
+  de: "%{path} ist kein shdo-Verzeichnis – zuerst `shdo init` ausführen"
+store.change_invalid:
+  en: this change would make shdo.toml invalid
+  de: Änderung würde shdo.toml ungültig machen
+board.status_required:
+  en: at least one status is required
+  de: mindestens ein Status nötig
+board.key_missing:
+  en: "%{what} %{n} has no key"
+  de: "%{what} %{n} hat keinen key"
+board.key_duplicate:
+  en: "%{what} key \"%{key}\" is used twice"
+  de: "%{what}-key „%{key}“ ist doppelt"
+board.default.todo:
+  en: Todo
+  de: Offen
+board.default.doing:
+  en: Doing
+  de: In Arbeit
+board.default.wait:
+  en: Waiting
+  de: Wartet
+board.default.done:
+  en: Done
+  de: Erledigt
+board.default.home:
+  en: Home
+  de: Privat
+board.default.work:
+  en: Work
+  de: Arbeit
+
+# Buckets -------------------------------------------------------------------
+bucket.name_missing:
+  en: name is missing
+  de: Name fehlt
+bucket.key_missing:
+  en: key is missing
+  de: key fehlt
+bucket.key_exists:
+  en: "bucket key \"%{key}\" already exists"
+  de: "Bucket-key „%{key}“ gibt es schon"
+bucket.key_reserved:
+  en: "\"%{key}\" is reserved"
+  de: "„%{key}“ ist reserviert"
+bucket.key_chars:
+  en: "key \"%{key}\": only a–z, 0–9, - and _ (typed as @%{key})"
+  de: "key „%{key}“: nur a–z, 0–9, - und _ (wird als @%{key} getippt)"
+bucket.not_found:
+  en: "bucket \"%{key}\" not found"
+  de: "Bucket „%{key}“ nicht gefunden"
+
+# Task IDs ------------------------------------------------------------------
+id.missing:
+  en: no ID given
+  de: keine ID angegeben
+id.not_found:
+  en: "no task with ID \"%{id}\""
+  de: "kein Task mit ID „%{id}“"
+id.ambiguous:
+  en: "ID \"%{id}\" is ambiguous: %{ids}"
+  de: "ID „%{id}“ ist nicht eindeutig: %{ids}"
+
+# Task files ----------------------------------------------------------------
+task.bad_filename:
+  en: "invalid file name %{path}"
+  de: "ungültiger Dateiname %{path}"
+task.bad_toml:
+  en: invalid TOML in the frontmatter
+  de: ungültiges TOML im Frontmatter
+task.title_missing:
+  en: field "title" is missing
+  de: Feld „title“ fehlt
+task.bad_date:
+  en: "field \"%{field}\": invalid date \"%{value}\""
+  de: "Feld „%{field}“: ungültiges Datum „%{value}“"
+task.bad_timestamp:
+  en: "field \"%{field}\": invalid timestamp \"%{value}\""
+  de: "Feld „%{field}“: ungültiger Zeitstempel „%{value}“"
+task.no_frontmatter:
+  en: "file does not start with \"%{delim}\""
+  de: "Datei beginnt nicht mit „%{delim}“"
+task.unclosed_frontmatter:
+  en: "closing \"%{delim}\" is missing"
+  de: "schließendes „%{delim}“ fehlt"
+
+# Git -----------------------------------------------------------------------
+git.not_found:
+  en: git could not be started – is git installed?
+  de: git konnte nicht gestartet werden – ist git installiert?
+git.failed:
+  en: "git %{cmd} failed:"
+  de: "git %{cmd} fehlgeschlagen:"
+git.no_repo:
+  en: "%{path} is not a git repository – `shdo init` creates one"
+  de: "%{path} ist kein Git-Repo – `shdo init` legt eins an"
+git.nothing:
+  en: nothing to commit
+  de: nichts zu committen
+git.committed:
+  en: committed
+  de: committet
+git.no_remote:
+  en: no remote configured, local only
+  de: kein Remote konfiguriert, nur lokal
+git.pulled:
+  en: pulled
+  de: gepullt
+git.pushed:
+  en: "pushed to %{remote}"
+  de: "gepusht nach %{remote}"
+
+# Board warnings and buckets ------------------------------------------------
+warn.no_status:
+  en: "%{id}: no status set"
+  de: "%{id}: kein Status gesetzt"
+warn.unknown_status:
+  en: "%{id}: unknown status \"%{status}\""
+  de: "%{id}: unbekannter Status „%{status}“"
+warn.unknown_bucket:
+  en: "%{id}: unknown bucket \"%{bucket}\""
+  de: "%{id}: unbekannter Bucket „%{bucket}“"
+bucket.none:
+  en: no bucket
+  de: ohne Bucket
+bucket.none_defined:
+  en: no buckets defined (see [[buckets]] in shdo.toml)
+  de: keine Buckets definiert (siehe [[buckets]] in shdo.toml)
+bucket.unknown:
+  en: "unknown bucket \"%{bucket}\" (available: %{keys})"
+  de: "unbekannter Bucket „%{bucket}“ (vorhanden: %{keys})"
+quickadd.title_missing:
+  en: title is missing
+  de: Titel fehlt
+
+# Themes --------------------------------------------------------------------
+theme.bad_color:
+  en: "invalid color \"%{color}\""
+  de: "ungültige Farbe „%{color}“"
+theme.unknown_token:
+  en: "unknown color token \"%{token}\""
+  de: "unbekanntes Farb-Token „%{token}“"
+theme.token:
+  en: "token \"%{token}\""
+  de: "Token „%{token}“"
+theme.file:
+  en: "theme %{path}"
+  de: "Theme %{path}"
+
+# Holidays (short names, max. 16 characters) -----------------------------
+holiday.Neujahr:
+  en: "New Year's Day"
+  de: "Neujahr"
+holiday.HeiligeDreiKoenige:
+  en: "Epiphany"
+  de: "Hl. Drei Könige"
+holiday.Frauentag:
+  en: "Women's Day"
+  de: "Frauentag"
+holiday.Faschingsdienstag:
+  en: "Shrove Tuesday"
+  de: "Faschingsdienstag"
+holiday.Aschermittwoch:
+  en: "Ash Wednesday"
+  de: "Aschermittwoch"
+holiday.Gruendonnerstag:
+  en: "Maundy Thursday"
+  de: "Gründonnerstag"
+holiday.Karfreitag:
+  en: "Good Friday"
+  de: "Karfreitag"
+holiday.Ostersonntag:
+  en: "Easter Sunday"
+  de: "Ostersonntag"
+holiday.Ostermontag:
+  en: "Easter Monday"
+  de: "Ostermontag"
+holiday.ErsterMai:
+  en: "Labour Day"
+  de: "Tag der Arbeit"
+holiday.TagDerBefreiung:
+  en: "Liberation Day"
+  de: "Tag d. Befreiung"
+holiday.ChristiHimmelfahrt:
+  en: "Ascension Day"
+  de: "Himmelfahrt"
+holiday.Pfingstsonntag:
+  en: "Whit Sunday"
+  de: "Pfingstsonntag"
+holiday.Pfingstmontag:
+  en: "Whit Monday"
+  de: "Pfingstmontag"
+holiday.SiebzehnterJuni:
+  en: "June 17"
+  de: "17. Juni"
+holiday.Fronleichnam:
+  en: "Corpus Christi"
+  de: "Fronleichnam"
+holiday.AugsburgerFriedensfest:
+  en: "Peace Festival"
+  de: "Friedensfest"
+holiday.MariaeHimmelfahrt:
+  en: "Assumption Day"
+  de: "Mariä Himmelf."
+holiday.Weltkindertag:
+  en: "Children's Day"
+  de: "Weltkindertag"
+holiday.TagDerDeutschenEinheit:
+  en: "German Unity Day"
+  de: "Dt. Einheit"
+holiday.Reformationstag:
+  en: "Reformation Day"
+  de: "Reformationstag"
+holiday.Allerheiligen:
+  en: "All Saints' Day"
+  de: "Allerheiligen"
+holiday.BussUndBettag:
+  en: "Repentance Day"
+  de: "Buß- u. Bettag"
+holiday.Heiligabend:
+  en: "Christmas Eve"
+  de: "Heiligabend"
+holiday.ErsterWeihnachtsfeiertag:
+  en: "Christmas Day"
+  de: "1. Weihnachtstag"
+holiday.ZweiterWeihnachtsfeiertag:
+  en: "Boxing Day"
+  de: "2. Weihnachtstag"
+holiday.Silvester:
+  en: "New Year's Eve"
+  de: "Silvester"
+warn.bad_holidays:
+  en: "holidays = \"%{value}\" is unknown, showing no holidays (e.g. \"de-bw\", \"de-by\")"
+  de: "holidays = „%{value}“ ist unbekannt, keine Feiertage (z. B. „de-bw“, „de-by“)"
+
+# TUI ---------------------------------------------------------------------
+kb.column:
+  en: "column"
+  de: "Spalte"
+kb.card:
+  en: "card"
+  de: "Karte"
+kb.move:
+  en: "move"
+  de: "verschieben"
+kb.new:
+  en: "new"
+  de: "neu"
+kb.edit:
+  en: "edit"
+  de: "bearbeiten"
+kb.editor:
+  en: "editor"
+  de: "Editor"
+kb.done:
+  en: "done"
+  de: "erledigt"
+kb.details:
+  en: "details"
+  de: "Details"
+kb.filter:
+  en: "filter"
+  de: "Filter"
+kb.buckets:
+  en: "buckets"
+  de: "Buckets"
+kb.bucket:
+  en: "bucket"
+  de: "Bucket"
+kb.toggle_done:
+  en: "done on/off"
+  de: "Erledigt ein/aus"
+kb.calendar:
+  en: "calendar"
+  de: "Kalender"
+kb.sync:
+  en: "sync"
+  de: "Sync"
+kb.theme:
+  en: "theme"
+  de: "Theme"
+kb.help:
+  en: "help"
+  de: "Hilfe"
+kb.quit:
+  en: "quit"
+  de: "Ende"
+kb.save:
+  en: "save"
+  de: "speichern"
+kb.cancel:
+  en: "cancel"
+  de: "abbrechen"
+kb.clear:
+  en: "clear"
+  de: "leeren"
+kb.next_field:
+  en: "next field"
+  de: "nächstes Feld"
+kb.prev_field:
+  en: "previous"
+  de: "voriges"
+kb.change:
+  en: "change"
+  de: "ändern"
+kb.discard:
+  en: "discard"
+  de: "verwerfen"
+kb.delete:
+  en: "delete"
+  de: "löschen"
+kb.scroll:
+  en: "scroll"
+  de: "scrollen"
+kb.close:
+  en: "close"
+  de: "schließen"
+kb.select:
+  en: "select"
+  de: "auswählen"
+kb.apply:
+  en: "apply"
+  de: "übernehmen"
+kb.toggle:
+  en: "on/off"
+  de: "an/aus"
+kb.only:
+  en: "only this"
+  de: "nur dieser"
+kb.all:
+  en: "all"
+  de: "alle"
+kb.new_bucket:
+  en: "new bucket"
+  de: "neuer Bucket"
+kb.rename:
+  en: "rename"
+  de: "umbenennen"
+kb.name_key:
+  en: "name/key"
+  de: "Name/Key"
+kb.create:
+  en: "create"
+  de: "anlegen"
+kb.run:
+  en: "run"
+  de: "ausführen"
+kb.set:
+  en: "set"
+  de: "setzen"
+kb.yes_key:
+  en: "y"
+  de: "j"
+help.title:
+  en: "Help"
+  de: "Hilfe"
+help.warnings:
+  en: "Warnings"
+  de: "Warnungen"
+help.nav:
+  en: "Navigation"
+  de: "Navigation"
+help.nav.left:
+  en: "column left"
+  de: "Spalte links"
+help.nav.right:
+  en: "column right"
+  de: "Spalte rechts"
+help.nav.down:
+  en: "next card"
+  de: "nächste Karte"
+help.nav.up:
+  en: "previous card"
+  de: "vorherige Karte"
+help.nav.first_last:
+  en: "first / last card"
+  de: "erste / letzte Karte"
+help.nav.details:
+  en: "show details"
+  de: "Details anzeigen"
+help.cards:
+  en: "Cards"
+  de: "Karten"
+help.cards.new:
+  en: "new card (form, status of the column preselected)"
+  de: "neue Karte (Formular, Status der Spalte vorbelegt)"
+help.cards.edit:
+  en: "edit card in the form"
+  de: "Karte im Formular bearbeiten"
+help.cards.editor:
+  en: "open task file in the editor"
+  de: "Task-Datei im Editor öffnen"
+help.cards.move_left:
+  en: "move card left (previous status)"
+  de: "Karte nach links (vorheriger Status)"
+help.cards.move_right:
+  en: "move card right (next status)"
+  de: "Karte nach rechts (nächster Status)"
+help.cards.done:
+  en: "done / reopen"
+  de: "erledigt / wieder offen"
+help.cards.rename:
+  en: "rename title"
+  de: "Titel umbenennen"
+help.cards.prio:
+  en: "priority high / normal / low"
+  de: "Prio hoch / normal / niedrig"
+help.cards.due:
+  en: "set due date (empty = remove)"
+  de: "Fälligkeit setzen (leer = entfernen)"
+help.cards.bucket:
+  en: "set bucket"
+  de: "Bucket setzen"
+help.cards.delete:
+  en: "delete"
+  de: "löschen"
+help.form:
+  en: "Form"
+  de: "Formular"
+help.form.fields:
+  en: "next / previous field"
+  de: "nächstes / voriges Feld"
+help.form.choice:
+  en: "change choice (status, priority, bucket)"
+  de: "Auswahl ändern (Status, Prio, Bucket)"
+help.form.save:
+  en: "save (from any field)"
+  de: "speichern (aus jedem Feld)"
+help.form.discard:
+  en: "discard"
+  de: "verwerfen"
+help.form.tokens:
+  en: "in the title: P1–P3, due:fri, @work"
+  de: "im Titel: P1–P3, due:fr, @work"
+help.buckets:
+  en: "Buckets"
+  de: "Buckets"
+help.buckets.filter:
+  en: "filter: which buckets are shown"
+  de: "Filter: welche Buckets angezeigt werden"
+help.buckets.manage:
+  en: "in the filter: create / rename / delete bucket"
+  de: "im Filter: Bucket anlegen / umbenennen / löschen"
+help.buckets.toggle:
+  en: "in the filter: on/off (applies at once)"
+  de: "im Filter: an/aus (wirkt sofort)"
+help.buckets.only:
+  en: "in the filter: only this one"
+  de: "im Filter: nur dieser"
+help.buckets.all:
+  en: "in the filter: all on/off"
+  de: "im Filter: alle an/aus"
+help.buckets.save:
+  en: "in the filter: save / discard"
+  de: "im Filter: speichern / verwerfen"
+help.buckets.inherit:
+  en: "exactly one bucket active → new tasks inherit it"
+  de: "genau ein Bucket aktiv → neue Tasks erben ihn"
+help.general:
+  en: "General"
+  de: "Allgemein"
+help.general.sync:
+  en: "sync with git remote"
+  de: "Sync mit Git-Remote"
+help.general.reload:
+  en: "reload"
+  de: "neu laden"
+help.general.done_column:
+  en: "show / hide the done column"
+  de: "Spalte „Erledigt“ ein-/ausblenden"
+help.general.calendar:
+  en: "show / hide calendar (tasks due per day)"
+  de: "Kalender ein-/ausblenden (fällige Tasks je Tag)"
+help.general.theme:
+  en: "choose theme"
+  de: "Theme wählen"
+help.general.help:
+  en: "this help"
+  de: "diese Hilfe"
+help.general.quit:
+  en: "quit or cancel"
+  de: "beenden bzw. abbrechen"
+help.dates:
+  en: "Dates"
+  de: "Datumsangaben"
+help.dates.iso:
+  en: "ISO"
+  de: "ISO"
+help.dates.day_month:
+  en: "next occurrence, also with year"
+  de: "nächstes Vorkommen, auch mit Jahr"
+help.dates.relative:
+  en: "relative: days, weeks, months"
+  de: "relativ: Tage, Wochen, Monate"
+help.dates.words:
+  en: "also heute, morgen, übermorgen"
+  de: "auch heute, morgen, übermorgen"
+help.dates.weekdays:
+  en: "next weekday, never today (also mo … so)"
+  de: "nächster Wochentag, nie heute (auch mo … so)"
+hdr.open:
+  en: "%{n} open"
+  de: "%{n} offen"
+hdr.overdue:
+  en: "%{n} overdue"
+  de: "%{n} überfällig"
+hdr.done_hidden:
+  en: "%{n} %{name} hidden"
+  de: "%{n} %{name} ausgeblendet"
+hdr.hidden:
+  en: "%{n} hidden"
+  de: "%{n} ausgeblendet"
+col.position:
+  en: "%{n} of %{total}"
+  de: "%{n} von %{total}"
+col.empty:
+  en: "(empty)"
+  de: "(leer)"
+input.due_hint:
+  en: "  empty = remove"
+  de: "  leer = entfernen"
+status.warnings:
+  en: "%{n} warning(s) – ? shows details"
+  de: "%{n} Warnung(en) – ? zeigt Details"
+theme.title:
+  en: "Theme"
+  de: "Theme"
+detail.title:
+  en: "Details"
+  de: "Details"
+detail.status:
+  en: "Status"
+  de: "Status"
+detail.prio:
+  en: "Priority"
+  de: "Prio"
+detail.bucket:
+  en: "Bucket"
+  de: "Bucket"
+detail.due:
+  en: "Due"
+  de: "Fällig"
+detail.created:
+  en: "Created"
+  de: "Erstellt"
+detail.moved:
+  en: "Moved"
+  de: "Verschoben"
+detail.done:
+  en: "Done"
+  de: "Erledigt"
+delete.title:
+  en: "Delete?"
+  de: "Löschen?"
+form.title_new:
+  en: "New task"
+  de: "Neuer Task"
+form.title_edit:
+  en: "Edit task · %{id}"
+  de: "Task bearbeiten · %{id}"
+form.from_title:
+  en: "from title: %{value}"
+  de: "aus Titel: %{value}"
+form.due_empty:
+  en: "empty = no due date"
+  de: "leer = keine Fälligkeit"
+form.due_unknown:
+  en: "unknown date"
+  de: "unbekanntes Datum"
+form.note_multiline:
+  en: "multi-line – edit in the editor (E)"
+  de: "mehrzeilig – im Editor bearbeiten (E)"
+form.from_filter:
+  en: "taken from the filter"
+  de: "aus Filter übernommen"
+form.tokens_hint:
+  en: "P1–P3 · due:fri · @bucket work in the title too"
+  de: "P1–P3 · due:fr · @bucket im Titel gehen auch"
+form.recognized:
+  en: "recognized: %{parts}"
+  de: "erkannt: %{parts}"
+filter.title:
+  en: "Filter · Buckets"
+  de: "Filter · Buckets"
+filter.no_buckets:
+  en: "no buckets yet – n creates one"
+  de: "noch keine Buckets – n legt einen an"
+bucket.new_title:
+  en: "New bucket"
+  de: "Neuer Bucket"
+bucket.field_name:
+  en: "Name"
+  de: "Name"
+bucket.field_key:
+  en: "Key"
+  de: "Key"
+bucket.key_hint:
+  en: "the key is stored in task files, a–z 0–9 - _"
+  de: "Key steht in den Task-Dateien, a–z 0–9 - _"
+bucket.rename_title:
+  en: "Rename bucket · @%{key}"
+  de: "Bucket umbenennen · @%{key}"
+bucket.rename_hint:
+  en: "display name only, tasks stay unchanged"
+  de: "nur der Anzeigename, Tasks bleiben unverändert"
+bucket.delete_empty:
+  en: "The bucket is empty."
+  de: "Der Bucket ist leer."
+bucket.delete_summary:
+  en: "%{n} task(s): %{open} open, %{done} done"
+  de: "%{n} Task(s): %{open} offen, %{done} erledigt"
+bucket.delete_title:
+  en: "Delete bucket \"%{name}\"?"
+  de: "Bucket „%{name}“ löschen?"
+bucket.move_title:
+  en: "Move tasks of \"%{name}\" to"
+  de: "Tasks von „%{name}“ verschieben nach"
+bucket.pick_title:
+  en: "Bucket"
+  de: "Bucket"
+input.title:
+  en: "Title"
+  de: "Titel"
+input.due:
+  en: "Due"
+  de: "Fällig"
+warn.theme_not_found:
+  en: "theme \"%{theme}\" not found"
+  de: "Theme „%{theme}“ nicht gefunden"
+msg.column_shown:
+  en: "\"%{name}\" shown"
+  de: "„%{name}“ eingeblendet"
+msg.column_hidden:
+  en: "\"%{name}\" hidden"
+  de: "„%{name}“ ausgeblendet"
+msg.calendar_shown:
+  en: "calendar shown"
+  de: "Kalender eingeblendet"
+msg.calendar_hidden:
+  en: "calendar hidden"
+  de: "Kalender ausgeblendet"
+msg.saved:
+  en: "saved"
+  de: "gespeichert"
+msg.discarded:
+  en: "discarded"
+  de: "verworfen"
+msg.not_deleted:
+  en: "not deleted"
+  de: "nicht gelöscht"
+msg.reloaded:
+  en: "reloaded"
+  de: "neu geladen"
+msg.into_hidden_column:
+  en: "hidden, v shows the column"
+  de: "ausgeblendet, v zeigt die Spalte"
+msg.deleted:
+  en: "deleted: %{title}"
+  de: "gelöscht: %{title}"
+msg.title_empty:
+  en: "the title must not be empty"
+  de: "Titel darf nicht leer sein"
+msg.renamed:
+  en: "renamed"
+  de: "umbenannt"
+msg.due_set:
+  en: "due %{due}"
+  de: "fällig %{due}"
+msg.due_removed:
+  en: "due date removed"
+  de: "Fälligkeit entfernt"
+msg.created:
+  en: "created: %{title}"
+  de: "angelegt: %{title}"
+msg.saved_task:
+  en: "saved: %{title}"
+  de: "gespeichert: %{title}"
+msg.from_filter:
+  en: "from filter"
+  de: "aus Filter"
+msg.hidden_by_filter:
+  en: "hidden by the filter"
+  de: "durch den Filter ausgeblendet"
+msg.sync_running:
+  en: "sync running …"
+  de: "Sync läuft …"
+msg.all:
+  en: "all"
+  de: "alle"
+msg.filter:
+  en: "filter: %{label}"
+  de: "Filter: %{label}"
+msg.bucket_created:
+  en: "bucket \"%{name}\" (@%{key}) created"
+  de: "Bucket „%{name}“ (@%{key}) angelegt"
+msg.bucket_renamed:
+  en: "renamed: %{name}"
+  de: "umbenannt: %{name}"
+msg.not_possible:
+  en: "not possible – see the note"
+  de: "nicht möglich – siehe Hinweis"
+msg.tasks_unassigned:
+  en: "%{n} task(s) now without bucket"
+  de: "%{n} Task(s) jetzt ohne Bucket"
+msg.tasks_moved:
+  en: "%{n} task(s) → %{name}"
+  de: "%{n} Task(s) → %{name}"
+msg.tasks_archived:
+  en: "%{n} done task(s) archived"
+  de: "%{n} erledigte Task(s) archiviert"
+msg.bucket_deleted:
+  en: "bucket \"%{name}\" deleted"
+  de: "Bucket „%{name}“ gelöscht"
+msg.bucket_set:
+  en: "bucket: %{name}"
+  de: "Bucket: %{name}"
+bucket.choice_delete:
+  en: "Delete bucket"
+  de: "Bucket löschen"
+bucket.choice_cancel:
+  en: "Cancel"
+  de: "Abbrechen"
+bucket.choice_archive:
+  en: "Archive done tasks and delete bucket"
+  de: "Erledigte archivieren und Bucket löschen"
+bucket.choice_archive_blocked:
+  en: "Archive done tasks and delete (%{open} still open)"
+  de: "Erledigte archivieren und löschen (noch %{open} offen)"
+bucket.choice_unassign:
+  en: "Remove the bucket from its tasks"
+  de: "Bucket aus den Tasks entfernen"
+bucket.choice_move:
+  en: "Move tasks to another bucket …"
+  de: "Tasks in anderen Bucket verschieben …"
+form.field.title:
+  en: "Title"
+  de: "Titel"
+form.field.status:
+  en: "Status"
+  de: "Status"
+form.field.prio:
+  en: "Priority"
+  de: "Prio"
+form.field.due:
+  en: "Due"
+  de: "Fällig"
+form.field.bucket:
+  en: "Bucket"
+  de: "Bucket"
+form.field.note:
+  en: "Note"
+  de: "Notiz"
+form.prio.high:
+  en: "high"
+  de: "hoch"
+form.prio.normal:
+  en: "normal"
+  de: "normal"
+form.prio.low:
+  en: "low"
+  de: "niedrig"
+cal.title:
+  en: "Calendar"
+  de: "Kalender"
+cal.week:
+  en: "Wk"
+  de: "KW"
+cal.wd.mon:
+  en: "Mo"
+  de: "Mo"
+cal.wd.tue:
+  en: "Tu"
+  de: "Di"
+cal.wd.wed:
+  en: "We"
+  de: "Mi"
+cal.wd.thu:
+  en: "Th"
+  de: "Do"
+cal.wd.fri:
+  en: "Fr"
+  de: "Fr"
+cal.wd.sat:
+  en: "Sa"
+  de: "Sa"
+cal.wd.sun:
+  en: "Su"
+  de: "So"
+cal.month.1:
+  en: "January"
+  de: "Januar"
+cal.month.2:
+  en: "February"
+  de: "Februar"
+cal.month.3:
+  en: "March"
+  de: "März"
+cal.month.4:
+  en: "April"
+  de: "April"
+cal.month.5:
+  en: "May"
+  de: "Mai"
+cal.month.6:
+  en: "June"
+  de: "Juni"
+cal.month.7:
+  en: "July"
+  de: "Juli"
+cal.month.8:
+  en: "August"
+  de: "August"
+cal.month.9:
+  en: "September"
+  de: "September"
+cal.month.10:
+  en: "October"
+  de: "Oktober"
+cal.month.11:
+  en: "November"
+  de: "November"
+cal.month.12:
+  en: "December"
+  de: "Dezember"

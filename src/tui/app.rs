@@ -6,6 +6,7 @@ use std::sync::mpsc::{self, Receiver};
 use anyhow::Result;
 use jiff::Zoned;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use rust_i18n::t;
 
 use super::form::{Form, Input};
 use crate::board::{self, Board, Filter, NO_BUCKET};
@@ -24,10 +25,10 @@ pub enum InputKind {
 }
 
 impl InputKind {
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
         match self {
-            InputKind::Rename => "Titel",
-            InputKind::Due => "Fällig",
+            InputKind::Rename => t!("input.title").into_owned(),
+            InputKind::Due => t!("input.due").into_owned(),
         }
     }
 }
@@ -127,7 +128,8 @@ pub struct App {
     pub show_done: bool,
     /// Show the calendar sidebar; stored per machine.
     pub show_calendar: bool,
-    pub region: Region,
+    /// Region for public holidays; `None` = no holidays.
+    pub region: Option<Region>,
     pub status: Option<(Level, String)>,
     pub themes: Vec<Theme>,
     pub theme: usize,
@@ -147,7 +149,7 @@ impl App {
             .iter()
             .position(|t| t.id == wanted)
             .unwrap_or_else(|| {
-                theme_warnings.push(format!("Theme „{wanted}“ nicht gefunden"));
+                theme_warnings.push(t!("warn.theme_not_found", theme = wanted).into_owned());
                 themes
                     .iter()
                     .position(|t| t.id == theme::DEFAULT_THEME)
@@ -158,17 +160,12 @@ impl App {
         };
         let show_done = cfg.show_done.unwrap_or(true);
         let show_calendar = cfg.show_calendar.unwrap_or(true);
-        let region = match cfg.holidays.as_deref() {
-            None => Region::default(),
-            Some(code) => Region::from_code(code).unwrap_or_else(|| {
-                let codes: Vec<_> = Region::codes().collect();
-                theme_warnings.push(format!(
-                    "holidays = „{code}“ unbekannt, nutze {} (möglich: {})",
-                    crate::holidays::DEFAULT_REGION,
-                    codes.join(", ")
-                ));
-                Region::default()
-            }),
+        let region = match Region::parse_setting(cfg.holidays.as_deref().unwrap_or("")) {
+            Ok(r) => r,
+            Err(value) => {
+                theme_warnings.push(t!("warn.bad_holidays", value = value).into_owned());
+                None
+            }
         };
         let board = Board::load(&store, &filter)?;
         let n = board.columns.len();
@@ -233,9 +230,9 @@ impl App {
         let res = config::set_bool(&self.cfg_path, "show_done", self.show_done);
         let name = self.board.columns[self.board.last_index()].def.name.clone();
         let msg = if self.show_done {
-            format!("„{name}“ eingeblendet")
+            t!("msg.column_shown", name = name).into_owned()
         } else {
-            format!("„{name}“ ausgeblendet")
+            t!("msg.column_hidden", name = name).into_owned()
         };
         self.report(res, msg);
     }
@@ -244,9 +241,9 @@ impl App {
         self.show_calendar = !self.show_calendar;
         let res = config::set_bool(&self.cfg_path, "show_calendar", self.show_calendar);
         let msg = if self.show_calendar {
-            "Kalender eingeblendet"
+            t!("msg.calendar_shown")
         } else {
-            "Kalender ausgeblendet"
+            t!("msg.calendar_hidden")
         };
         self.report(res, msg);
     }
@@ -324,7 +321,7 @@ impl App {
         let keep = self.selected_id();
         self.reload(keep);
         match res.and_then(|()| Task::load(&path).map(|_| ())) {
-            Ok(()) => self.set_status(Level::Ok, "gespeichert"),
+            Ok(()) => self.set_status(Level::Ok, t!("msg.saved")),
             Err(e) => self.set_status(Level::Error, format!("{}: {e:#}", path.display())),
         }
     }
@@ -349,7 +346,7 @@ impl App {
                 }
             },
             Mode::Form(mut form) => match key.code {
-                KeyCode::Esc => self.set_status(Level::Info, "verworfen"),
+                KeyCode::Esc => self.set_status(Level::Info, t!("msg.discarded")),
                 KeyCode::Enter => {
                     if let Err(e) = self.submit_form(&form) {
                         self.set_status(Level::Error, format!("{e:#}"));
@@ -366,7 +363,7 @@ impl App {
                 if matches!(key.code, KeyCode::Char('j' | 'J' | 'y' | 'Y')) {
                     self.delete();
                 } else {
-                    self.set_status(Level::Info, "nicht gelöscht");
+                    self.set_status(Level::Info, t!("msg.not_deleted"));
                 }
             }
             Mode::Help { scroll } => match key.code {
@@ -475,7 +472,7 @@ impl App {
             KeyCode::Char('R') => {
                 let keep = self.selected_id();
                 self.reload(keep);
-                self.set_status(Level::Info, "neu geladen");
+                self.set_status(Level::Info, t!("msg.reloaded"));
             }
             KeyCode::Char('t') => {
                 self.mode = Mode::Themes {
@@ -521,7 +518,7 @@ impl App {
         self.reload(Some(task.id.clone()));
         let mut msg = format!("→ {}", defs[target as usize].name);
         if target as usize >= self.visible_columns() {
-            msg.push_str(" (ausgeblendet, v zeigt die Spalte)");
+            msg.push_str(&format!(" ({})", t!("msg.into_hidden_column")));
         }
         self.report(res, msg);
     }
@@ -549,7 +546,7 @@ impl App {
         };
         let res = self.store.delete(&task);
         self.reload(None);
-        self.report(res, format!("gelöscht: {}", task.title));
+        self.report(res, t!("msg.deleted", title = task.title));
     }
 
     /// Returns `false` if the input is invalid and should stay open.
@@ -559,10 +556,10 @@ impl App {
             InputKind::Rename => {
                 let title = text.trim().to_string();
                 if title.is_empty() {
-                    self.set_status(Level::Error, "Titel darf nicht leer sein");
+                    self.set_status(Level::Error, t!("msg.title_empty"));
                     return false;
                 }
-                self.edit_selected("umbenannt", |t| t.set_title(&title));
+                self.edit_selected(&t!("msg.renamed"), |t| t.set_title(&title));
             }
             InputKind::Due => {
                 let due = if text.trim().is_empty() {
@@ -577,8 +574,8 @@ impl App {
                     }
                 };
                 let msg = match due {
-                    Some(d) => format!("fällig {}", dates::fmt_due(d, today)),
-                    None => "Fälligkeit entfernt".into(),
+                    Some(d) => t!("msg.due_set", due = dates::fmt_due(d, today)).into_owned(),
+                    None => t!("msg.due_removed").into_owned(),
                 };
                 self.edit_selected(&msg, |t| t.set_due(due));
             }
@@ -628,19 +625,19 @@ impl App {
 
         let id = task.id.clone();
         self.reload(Some(id.clone()));
-        let mut msg = format!(
-            "{}: {}",
-            if is_new { "angelegt" } else { "gespeichert" },
-            task.title
-        );
+        let mut msg = if is_new {
+            t!("msg.created", title = task.title).into_owned()
+        } else {
+            t!("msg.saved_task", title = task.title).into_owned()
+        };
         if let Some(b) = &bucket {
             msg.push_str(&format!(" @{b}"));
             if form.inherited && q.bucket.is_none() {
-                msg.push_str(" (aus Filter)");
+                msg.push_str(&format!(" ({})", t!("msg.from_filter")));
             }
         }
         if self.board.find(&id).is_none() {
-            msg.push_str(" – durch den Filter ausgeblendet");
+            msg.push_str(&format!(" – {}", t!("msg.hidden_by_filter")));
         }
         self.set_status(Level::Ok, msg);
         Ok(())
@@ -662,15 +659,12 @@ impl App {
             let _ = tx.send(Git::new(&dir, true).sync());
         });
         self.sync_rx = Some(rx);
-        self.set_status(Level::Info, "Sync läuft …");
+        self.set_status(Level::Info, t!("msg.sync_running"));
     }
 
     fn no_buckets(&mut self) -> bool {
         if self.board.buckets.is_empty() {
-            self.set_status(
-                Level::Info,
-                "keine Buckets definiert – siehe [[buckets]] in shdo.toml",
-            );
+            self.set_status(Level::Info, t!("bucket.none_defined"));
             return true;
         }
         false
@@ -759,8 +753,11 @@ impl App {
                 };
                 self.apply_filter(f.clone());
                 let res = config::set_list(&self.cfg_path, "buckets", &f.buckets);
-                let label = self.board.filter_label().unwrap_or_else(|| "alle".into());
-                self.report(res, format!("Filter: {label}"));
+                let label = self
+                    .board
+                    .filter_label()
+                    .unwrap_or_else(|| t!("msg.all").into_owned());
+                self.report(res, t!("msg.filter", label = label));
                 return;
             }
             KeyCode::Esc | KeyCode::Char('q') => {
@@ -846,7 +843,7 @@ impl App {
                         self.open_filter_at(idx);
                         self.set_status(
                             Level::Ok,
-                            format!("Bucket „{}“ (@{new_key}) angelegt", name.text.trim()),
+                            t!("msg.bucket_created", name = name.text.trim(), key = new_key),
                         );
                         return;
                     }
@@ -880,7 +877,10 @@ impl App {
                     let keep = self.selected_id();
                     self.reload(keep);
                     self.open_filter_at(self.bucket_index(&bucket));
-                    self.set_status(Level::Ok, format!("umbenannt: {}", input.text.trim()));
+                    self.set_status(
+                        Level::Ok,
+                        t!("msg.bucket_renamed", name = input.text.trim()),
+                    );
                 }
                 Err(e) => {
                     self.set_status(Level::Error, format!("{e:#}"));
@@ -898,29 +898,41 @@ impl App {
     pub fn delete_choices(&self, open: usize, done: usize) -> Vec<(DeleteChoice, bool, String)> {
         if open + done == 0 {
             return vec![
-                (DeleteChoice::Delete, true, "Bucket löschen".into()),
-                (DeleteChoice::Cancel, true, "Abbrechen".into()),
+                (
+                    DeleteChoice::Delete,
+                    true,
+                    t!("bucket.choice_delete").into_owned(),
+                ),
+                (
+                    DeleteChoice::Cancel,
+                    true,
+                    t!("bucket.choice_cancel").into_owned(),
+                ),
             ];
         }
         let others = self.board.buckets.len() > 1;
         let archive_text = if open > 0 {
-            format!("Erledigte archivieren und löschen (noch {open} offen)")
+            t!("bucket.choice_archive_blocked", open = open).into_owned()
         } else {
-            "Erledigte archivieren und Bucket löschen".into()
+            t!("bucket.choice_archive").into_owned()
         };
         vec![
             (
                 DeleteChoice::Unassign,
                 true,
-                "Bucket aus den Tasks entfernen".into(),
+                t!("bucket.choice_unassign").into_owned(),
             ),
             (
                 DeleteChoice::Move,
                 others,
-                "Tasks in anderen Bucket verschieben …".into(),
+                t!("bucket.choice_move").into_owned(),
             ),
             (DeleteChoice::ArchiveDone, open == 0, archive_text),
-            (DeleteChoice::Cancel, true, "Abbrechen".into()),
+            (
+                DeleteChoice::Cancel,
+                true,
+                t!("bucket.choice_cancel").into_owned(),
+            ),
         ]
     }
 
@@ -956,7 +968,7 @@ impl App {
             KeyCode::Enter => {
                 let (choice, enabled, _) = &choices[idx];
                 if !enabled {
-                    self.set_status(Level::Info, "nicht möglich – siehe Hinweis");
+                    self.set_status(Level::Info, t!("msg.not_possible"));
                     self.mode = Mode::BucketDelete {
                         key: bucket,
                         open,
@@ -1038,9 +1050,16 @@ impl App {
             let n = tasks.len();
             let what = match &retarget {
                 Retarget::Keep => String::new(),
-                Retarget::To(None) => format!(", {n} Task(s) jetzt ohne Bucket"),
-                Retarget::To(Some(t)) => format!(", {n} Task(s) → {}", self.board.bucket_name(t)),
-                Retarget::Archive => format!(", {n} erledigte Task(s) archiviert"),
+                Retarget::To(None) => format!(", {}", t!("msg.tasks_unassigned", n = n)),
+                Retarget::To(Some(target)) => format!(
+                    ", {}",
+                    t!(
+                        "msg.tasks_moved",
+                        n = n,
+                        name = self.board.bucket_name(target)
+                    )
+                ),
+                Retarget::Archive => format!(", {}", t!("msg.tasks_archived", n = n)),
             };
             for mut t in tasks {
                 match &retarget {
@@ -1064,7 +1083,10 @@ impl App {
         self.reload(keep);
         self.open_filter_at(0);
         match res {
-            Ok(what) => self.set_status(Level::Ok, format!("Bucket „{name}“ gelöscht{what}")),
+            Ok(what) => self.set_status(
+                Level::Ok,
+                format!("{}{what}", t!("msg.bucket_deleted", name = name)),
+            ),
             Err(e) => self.set_status(Level::Error, format!("{e:#}")),
         }
     }
@@ -1098,15 +1120,15 @@ impl App {
                     .checked_sub(1)
                     .map(|i| self.board.buckets[i].key.clone());
                 let msg = match &bucket {
-                    Some(b) => format!("Bucket: {}", self.board.bucket_name(b)),
-                    None => "ohne Bucket".into(),
+                    Some(b) => t!("msg.bucket_set", name = self.board.bucket_name(b)).into_owned(),
+                    None => t!("bucket.none").into_owned(),
                 };
                 let id = self.selected_id();
                 self.edit_selected(&msg, |t| t.set_bucket(bucket.as_deref()));
                 if let Some(id) = id
                     && self.board.find(&id).is_none()
                 {
-                    self.set_status(Level::Ok, format!("{msg} – durch den Filter ausgeblendet"));
+                    self.set_status(Level::Ok, format!("{msg} – {}", t!("msg.hidden_by_filter")));
                 }
             }
             _ => {}

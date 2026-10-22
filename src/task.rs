@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, anyhow, bail};
 use jiff::civil::Date;
 use jiff::{Timestamp, Zoned};
+use rust_i18n::t;
 use toml_edit::{DocumentMut, Item, value};
 
 pub const DELIM: &str = "+++";
@@ -60,12 +61,12 @@ impl Task {
     }
 
     pub fn load(path: &Path) -> Result<Task> {
-        let raw =
-            fs::read_to_string(path).with_context(|| format!("{} nicht lesbar", path.display()))?;
+        let raw = fs::read_to_string(path)
+            .with_context(|| t!("io.read", path = path.display()).into_owned())?;
         let id = path
             .file_stem()
             .and_then(|s| s.to_str())
-            .ok_or_else(|| anyhow!("ungültiger Dateiname {}", path.display()))?
+            .ok_or_else(|| anyhow!(t!("task.bad_filename", path = path.display())))?
             .to_string();
         let mut task = Task::parse(&id, path.to_path_buf(), &raw)?;
         task.mtime = fs::metadata(path)
@@ -77,13 +78,13 @@ impl Task {
 
     pub fn parse(id: &str, path: PathBuf, raw: &str) -> Result<Task> {
         let (front, body) = split_frontmatter(raw)?;
-        let doc: DocumentMut = front.parse().context("ungültiges TOML im Frontmatter")?;
+        let doc: DocumentMut = front.parse().context(t!("task.bad_toml"))?;
         let title = doc
             .get("title")
             .and_then(Item::as_str)
             .map(str::trim)
             .filter(|t| !t.is_empty())
-            .ok_or_else(|| anyhow!("Feld „title“ fehlt"))?
+            .ok_or_else(|| anyhow!(t!("task.title_missing")))?
             .to_string();
         // `column` is the field's former name and is still accepted.
         let status = doc
@@ -130,9 +131,9 @@ impl Task {
         // Write to a temporary file first, then rename: never a half-written file.
         let tmp = self.path.with_extension("md.tmp");
         fs::write(&tmp, self.render())
-            .with_context(|| format!("{} nicht schreibbar", tmp.display()))?;
+            .with_context(|| t!("io.write", path = tmp.display()).into_owned())?;
         fs::rename(&tmp, &self.path)
-            .with_context(|| format!("{} nicht schreibbar", self.path.display()))?;
+            .with_context(|| t!("io.write", path = self.path.display()).into_owned())?;
         Ok(())
     }
 
@@ -259,7 +260,7 @@ fn get_date(doc: &DocumentMut, key: &str) -> Result<Option<Date>> {
     date_part
         .parse::<Date>()
         .map(Some)
-        .map_err(|_| anyhow!("Feld „{key}“: ungültiges Datum {s:?}"))
+        .map_err(|_| anyhow!(t!("task.bad_date", field = key, value = s)))
 }
 
 fn get_timestamp(doc: &DocumentMut, key: &str) -> Result<Option<Timestamp>> {
@@ -277,7 +278,7 @@ fn get_timestamp(doc: &DocumentMut, key: &str) -> Result<Option<Timestamp>> {
     if let Ok(d) = s.parse::<Date>() {
         return Ok(d.to_zoned(tz).ok().map(|z| z.timestamp()));
     }
-    bail!("Feld „{key}“: ungültiger Zeitstempel {s:?}")
+    bail!(t!("task.bad_timestamp", field = key, value = s))
 }
 
 fn split_frontmatter(raw: &str) -> Result<(&str, &str)> {
@@ -286,7 +287,7 @@ fn split_frontmatter(raw: &str) -> Result<(&str, &str)> {
         .unwrap_or(raw)
         .strip_prefix(DELIM)
         .and_then(|r| r.strip_prefix("\r\n").or_else(|| r.strip_prefix('\n')))
-        .ok_or_else(|| anyhow!("Datei beginnt nicht mit „{DELIM}“"))?;
+        .ok_or_else(|| anyhow!(t!("task.no_frontmatter", delim = DELIM)))?;
     let mut pos = 0;
     for line in rest.split_inclusive('\n') {
         if line.trim_end() == DELIM {
@@ -294,7 +295,7 @@ fn split_frontmatter(raw: &str) -> Result<(&str, &str)> {
         }
         pos += line.len();
     }
-    bail!("schließendes „{DELIM}“ fehlt")
+    bail!(t!("task.unclosed_frontmatter", delim = DELIM))
 }
 
 #[cfg(test)]

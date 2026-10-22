@@ -3,6 +3,7 @@
 
 use anyhow::{Result, bail};
 use jiff::civil::Date;
+use rust_i18n::t;
 
 use crate::dates;
 
@@ -32,7 +33,7 @@ pub fn parse(words: &[String], today: Date) -> Result<QuickAdd> {
         }
     }
     if title.is_empty() {
-        bail!("Titel fehlt");
+        bail!(t!("quickadd.title_missing"));
     }
     Ok(QuickAdd {
         title: title.join(" "),

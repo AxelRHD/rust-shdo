@@ -10,27 +10,18 @@ use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
+use rust_i18n::t;
 
 use super::app::App;
+use crate::i18n::{self, Lang};
 use crate::theme::Palette;
 
 /// Border (2) + padding (1) + week number (3) + 7 days of 3 characters.
 pub const WIDTH: u16 = 2 + 1 + 3 + 7 * 3;
 
-const MONTHS: [&str; 12] = [
-    "Januar",
-    "Februar",
-    "März",
-    "April",
-    "Mai",
-    "Juni",
-    "Juli",
-    "August",
-    "September",
-    "Oktober",
-    "November",
-    "Dezember",
-];
+fn is_weekend(wd: Weekday) -> bool {
+    matches!(wd, Weekday::Saturday | Weekday::Sunday)
+}
 
 /// Superscript count in the gap after the day; `⁺` from 10 on.
 fn superscript(n: usize) -> char {
@@ -42,21 +33,57 @@ fn first_of_month(d: Date) -> Date {
     d.first_of_month()
 }
 
-fn weeks_in_month(first: Date) -> usize {
-    let offset = first.weekday().to_monday_zero_offset() as usize;
-    (offset + first.days_in_month() as usize).div_ceil(7)
+/// Weeks start on Sunday in US English, on Monday otherwise.
+fn sunday_first(lang: Lang) -> bool {
+    lang == Lang::En
+}
+
+/// Position of `d` within its week row.
+fn week_offset(d: Date, sunday_first: bool) -> usize {
+    if sunday_first {
+        d.weekday().to_sunday_zero_offset() as usize
+    } else {
+        d.weekday().to_monday_zero_offset() as usize
+    }
+}
+
+fn weeks_in_month(first: Date, sunday_first: bool) -> usize {
+    (week_offset(first, sunday_first) + first.days_in_month() as usize).div_ceil(7)
 }
 
 /// Rows for one month: title, weekday header, weeks, blank line.
-fn month_height(first: Date) -> usize {
-    3 + weeks_in_month(first)
+fn month_height(first: Date, sunday_first: bool) -> usize {
+    3 + weeks_in_month(first, sunday_first)
+}
+
+fn month_name(month: i8) -> String {
+    let key = format!("cal.month.{month}");
+    t!(key.as_str()).into_owned()
+}
+
+/// Two-letter weekday for the header.
+fn weekday_header(wd: Weekday) -> String {
+    let key = match wd {
+        Weekday::Monday => "cal.wd.mon",
+        Weekday::Tuesday => "cal.wd.tue",
+        Weekday::Wednesday => "cal.wd.wed",
+        Weekday::Thursday => "cal.wd.thu",
+        Weekday::Friday => "cal.wd.fri",
+        Weekday::Saturday => "cal.wd.sat",
+        Weekday::Sunday => "cal.wd.sun",
+    };
+    t!(key).into_owned()
 }
 
 pub fn draw(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
     let today = crate::dates::today();
     let block = Block::bordered()
         .border_style(Style::new().fg(c.border))
-        .title(Span::styled("Kalender", Style::new().fg(c.title)));
+        .title(Span::styled(
+            t!("cal.title").into_owned(),
+            Style::new().fg(c.title),
+        ));
+    let sunday_first = sunday_first(i18n::current());
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -82,20 +109,30 @@ pub fn draw(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
         vec![current],
     ]
     .into_iter()
-    .find(|ms| ms.iter().map(|m| month_height(*m)).sum::<usize>() <= height)
+    .find(|ms| {
+        ms.iter()
+            .map(|m| month_height(*m, sunday_first))
+            .sum::<usize>()
+            <= height
+    })
     .unwrap_or_else(|| vec![current]);
 
     let first = months[0];
     let last = months[months.len() - 1];
     let range_end = last.last_of_month();
-    let holiday_list = app.region.between(first, range_end);
-    let holiday_set: HashMap<Date, &str> = holiday_list.iter().copied().collect();
+    let holiday_list = app
+        .region
+        .map(|r| r.between(first, range_end))
+        .unwrap_or_default();
+    let holiday_set: HashMap<Date, &str> =
+        holiday_list.iter().map(|(d, n)| (*d, n.as_str())).collect();
 
     let mut lines: Vec<Line> = vec![];
     for m in &months {
         month_lines(
             &mut lines,
             *m,
+            sunday_first,
             *m == current,
             today,
             &due,
@@ -116,7 +153,7 @@ pub fn draw(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
         };
         lines.push(Line::from(vec![
             Span::styled(
-                format!(" {:02}.{:02}. ", d.day(), d.month()),
+                format!(" {} ", crate::dates::fmt_day_month(d)),
                 Style::new().fg(c.holiday),
             ),
             Span::styled(name, style),
@@ -129,6 +166,7 @@ pub fn draw(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
 fn month_lines(
     lines: &mut Vec<Line<'static>>,
     first: Date,
+    sunday_first: bool,
     is_current: bool,
     today: Date,
     due: &HashMap<Date, usize>,
@@ -136,7 +174,7 @@ fn month_lines(
     holidays: &HashMap<Date, &str>,
     c: &Palette,
 ) {
-    let title = format!("{} {}", MONTHS[first.month() as usize - 1], first.year());
+    let title = format!("{} {}", month_name(first.month()), first.year());
     let title_style = if is_current {
         Style::new().fg(c.title).add_modifier(Modifier::BOLD)
     } else {
@@ -146,20 +184,31 @@ fn month_lines(
         format!("{title:^25}"),
         title_style,
     )));
-    let mut header = vec![Span::styled(" KW", Style::new().fg(c.dim))];
-    for (i, wd) in ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
-        .iter()
-        .enumerate()
-    {
-        let color = if i >= 5 { c.weekend } else { c.dim };
-        header.push(Span::styled(format!(" {wd}"), Style::new().fg(color)));
+    let mut header = vec![Span::styled(
+        format!("{:>3}", t!("cal.week")),
+        Style::new().fg(c.dim),
+    )];
+    let offset = week_offset(first, sunday_first) as i64;
+    let mut week_start = first.checked_sub(offset.days()).unwrap_or(first);
+    for i in 0..7 {
+        let wd = week_start
+            .checked_add((i as i64).days())
+            .unwrap_or(week_start)
+            .weekday();
+        let color = if is_weekend(wd) { c.weekend } else { c.dim };
+        header.push(Span::styled(
+            format!(" {}", weekday_header(wd)),
+            Style::new().fg(color),
+        ));
     }
     lines.push(Line::from(header));
 
-    let offset = first.weekday().to_monday_zero_offset() as i64;
-    let mut week_start = first.checked_sub(offset.days()).unwrap_or(first);
-    for _ in 0..weeks_in_month(first) {
-        let kw = week_start.iso_week_date().week();
+    for _ in 0..weeks_in_month(first, sunday_first) {
+        // ISO week of the row's Monday (the second day when weeks start on Sunday)
+        let monday = week_start
+            .checked_add((if sunday_first { 1 } else { 0 }).days())
+            .unwrap_or(week_start);
+        let kw = monday.iso_week_date().week();
         let mut spans = vec![Span::styled(format!(" {kw:>2}"), Style::new().fg(c.dim))];
         for i in 0..7 {
             let d = week_start
@@ -197,7 +246,7 @@ fn day_style(
     holidays: &HashMap<Date, &str>,
     c: &Palette,
 ) -> Style {
-    let weekend = matches!(d.weekday(), Weekday::Saturday | Weekday::Sunday);
+    let weekend = is_weekend(d.weekday());
     let mut style = if holidays.contains_key(&d) {
         Style::new().fg(c.holiday).add_modifier(Modifier::BOLD)
     } else if weekend {
@@ -226,12 +275,15 @@ mod tests {
     #[test]
     fn month_geometry() {
         // October 2026 starts on a Thursday: 5 week rows
-        assert_eq!(weeks_in_month(date(2026, 10, 1)), 5);
+        assert_eq!(weeks_in_month(date(2026, 10, 1), false), 5);
         // February 2027 starts on a Monday and has 28 days: exactly 4 weeks
-        assert_eq!(weeks_in_month(date(2027, 2, 1)), 4);
+        assert_eq!(weeks_in_month(date(2027, 2, 1), false), 4);
+        // Sunday-first: February 2027 then spans 5 rows
+        assert_eq!(weeks_in_month(date(2027, 2, 1), true), 5);
         // August 2027 starts on a Sunday: 6 week rows
-        assert_eq!(weeks_in_month(date(2027, 8, 1)), 6);
-        assert_eq!(month_height(date(2026, 10, 1)), 8);
+        assert_eq!(weeks_in_month(date(2027, 8, 1), false), 6);
+        assert_eq!(weeks_in_month(date(2027, 8, 1), true), 5);
+        assert_eq!(month_height(date(2026, 10, 1), false), 8);
     }
 
     #[test]

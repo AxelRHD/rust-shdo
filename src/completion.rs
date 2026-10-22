@@ -31,7 +31,7 @@ const FISH_DYNAMIC: &str = r#"
 complete -c shdo -f
 complete -c shdo -l dir -x -a '(__fish_complete_directories (commandline -ct))'
 
-function __shdo_nargs --description 'Positionsargumente inkl. Befehl, ohne --dir'
+function __shdo_nargs --description 'Positional arguments including the command, without --dir'
     set -l toks (commandline -opc)
     set -e toks[1]
     set -l n 0
@@ -52,13 +52,13 @@ function __shdo_nargs --description 'Positionsargumente inkl. Befehl, ohne --dir
     echo $n
 end
 
-function __shdo_arg --description '__shdo_arg <pos> <befehl…>: Cursor steht auf Argument <pos>'
+function __shdo_arg --description '__shdo_arg <pos> <command…>: cursor is on argument <pos>'
     set -l pos $argv[1]
     set -e argv[1]
     __fish_seen_subcommand_from $argv; and test (__shdo_nargs) -eq $pos
 end
 
-function __shdo_complete --description 'shdo __complete mit dem --dir der Kommandozeile'
+function __shdo_complete --description 'shdo __complete using the --dir from the command line'
     set -l toks (commandline -opc)
     set -l dir
     if set -l i (contains -i -- --dir $toks); and set -q toks[(math $i + 1)]
@@ -76,24 +76,24 @@ complete -c shdo -n 'string match -q -- "due:*" (commandline -ct)' -f -a '(__shd
 "#;
 
 pub const SETUP_HELP: &str = "\
-Einrichten:
+Setup:
   fish  shdo completions fish > ~/.config/fish/completions/shdo.fish
   bash  shdo completions bash > ~/.local/share/bash-completion/completions/shdo
   zsh   shdo completions zsh > ~/.zfunc/_shdo
-        (in ~/.zshrc vor compinit: fpath+=~/.zfunc)
+        (in ~/.zshrc before compinit: fpath+=~/.zfunc)
 
-Danach eine neue Shell öffnen. Nach einem Update von shdo den Befehl
-erneut ausführen, damit neue Befehle und Optionen dabei sind.
+Then open a new shell. Run the command again after updating shdo so new
+commands and options are included.
 
-Fish bekommt zusätzlich dynamische Vorschläge: Task-IDs mit Titel,
-Status, Buckets (@…) und due:-Werte mit Datum. Bash, Zsh, Elvish und
-PowerShell kennen Befehle und Optionen.";
+Fish additionally gets dynamic suggestions: task IDs with titles,
+statuses, buckets (@…) and due: values with dates. Bash, Zsh, Elvish
+and PowerShell complete commands and options.";
 
 /// Guide for `shdo completions` without a shell, pointing at the user's shell.
 pub fn setup_guide() -> String {
     let mut out = format!(
-        "Gibt ein Completion-Skript für die Shell aus.\n\n\
-         Aufruf: shdo completions <SHELL>\n\
+        "Prints a completion script for your shell.\n\n\
+         Usage: shdo completions <SHELL>\n\
          Shells: bash, elvish, fish, powershell, zsh\n\n{SETUP_HELP}\n"
     );
     let own = std::env::var("SHELL")
@@ -102,7 +102,7 @@ pub fn setup_guide() -> String {
         .and_then(|name| Shell::from_str(&name, true).ok());
     if let Some(shell) = own {
         out.push_str(&format!(
-            "\nDeine Shell laut $SHELL: {shell} → shdo completions {shell}\n"
+            "\nYour shell according to $SHELL: {shell} → shdo completions {shell}\n"
         ));
     }
     out
@@ -161,7 +161,7 @@ pub fn candidates(store: &Store, kind: Kind) -> Result<Vec<String>> {
                 .iter()
                 .map(|b| format!("{}\t{}", b.key, b.name))
                 .collect();
-            v.push("-\tohne Bucket".into());
+            v.push("-\tno bucket".into());
             v
         }
         Kind::AtBuckets => store
@@ -177,19 +177,7 @@ pub fn candidates(store: &Store, kind: Kind) -> Result<Vec<String>> {
 
 fn due_candidates(today: jiff::civil::Date) -> Vec<String> {
     [
-        "heute",
-        "morgen",
-        "übermorgen",
-        "mo",
-        "di",
-        "mi",
-        "do",
-        "fr",
-        "sa",
-        "so",
-        "+1w",
-        "+2w",
-        "+1m",
+        "today", "tomorrow", "mon", "tue", "wed", "thu", "fri", "sat", "sun", "+1w", "+2w", "+1m",
     ]
     .iter()
     .filter_map(|s| {
@@ -207,7 +195,7 @@ mod tests {
     #[test]
     fn due_candidates_resolve_dates() {
         let c = due_candidates(date(2026, 10, 22));
-        assert!(c.contains(&"due:fr\tfr 23.10.2026".to_string()), "{c:?}");
+        assert!(c.contains(&"due:fri\tFRI 10/23/2026".to_string()), "{c:?}");
         assert!(c.iter().all(|l| l.starts_with("due:") && l.contains('\t')));
     }
 
@@ -215,17 +203,14 @@ mod tests {
     fn candidates_from_store() {
         let tmp = tempfile::tempdir().unwrap();
         let store = Store::new(tmp.path().to_path_buf());
-        store.init().unwrap();
+        store.init(crate::i18n::Lang::De).unwrap();
         let t = store.create("Rechnung", "todo", &jiff::Zoned::now());
         t.save().unwrap();
         let ids = candidates(&store, Kind::Ids).unwrap();
         assert_eq!(ids, [format!("{}\tRechnung (Offen)", t.id)]);
         let st = candidates(&store, Kind::Statuses).unwrap();
         assert_eq!(st[0], "todo\tOffen");
-        assert_eq!(
-            candidates(&store, Kind::Buckets).unwrap(),
-            ["-\tohne Bucket"]
-        );
+        assert_eq!(candidates(&store, Kind::Buckets).unwrap(), ["-\tno bucket"]);
         assert!(candidates(&store, Kind::AtBuckets).unwrap().is_empty());
     }
 }
