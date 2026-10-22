@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-10-22
 
 - Live search with `/` in titles, notes and IDs; works together with the bucket filter
   and the calendar counts, `Esc` clears it
