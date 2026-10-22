@@ -103,7 +103,10 @@ impl App {
             .position(|t| t.id == wanted)
             .unwrap_or_else(|| {
                 theme_warnings.push(format!("Theme „{wanted}“ nicht gefunden"));
-                0
+                themes
+                    .iter()
+                    .position(|t| t.id == theme::DEFAULT_THEME)
+                    .unwrap_or(0)
             });
         let filter = Filter {
             buckets: cfg.buckets.clone(),

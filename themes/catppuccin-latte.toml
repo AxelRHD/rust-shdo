@@ -1,0 +1,19 @@
+# Catppuccin Latte – https://catppuccin.com
+name = "Catppuccin Latte"
+
+[colors]
+bg = "#eff1f5"            # base
+fg = "#4c4f69"            # text
+dim = "#8c8fa1"           # overlay1
+border = "#bcc0cc"        # surface1
+border_active = "#40a02b" # green
+title = "#1e66f5"         # blue
+accent = "#179299"        # teal
+selection = "#ccd0da"     # surface0
+prio_high = "#d20f39"     # red
+prio_low = "#9ca0b0"      # overlay0
+overdue = "#d20f39"
+today = "#df8e1d"         # yellow
+done = "#40a02b"
+key = "#8839ef"           # mauve
+warn = "#fe640b"          # peach

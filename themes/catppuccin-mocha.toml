@@ -1,0 +1,19 @@
+# Catppuccin Mocha – https://catppuccin.com
+name = "Catppuccin Mocha"
+
+[colors]
+bg = "#1e1e2e"            # base
+fg = "#cdd6f4"            # text
+dim = "#6c7086"           # overlay0
+border = "#45475a"        # surface1
+border_active = "#a6e3a1" # green
+title = "#89b4fa"         # blue
+accent = "#94e2d5"        # teal
+selection = "#313244"     # surface0
+prio_high = "#f38ba8"     # red
+prio_low = "#6c7086"
+overdue = "#f38ba8"
+today = "#f9e2af"         # yellow
+done = "#a6e3a1"
+key = "#cba6f7"           # mauve
+warn = "#fab387"          # peach

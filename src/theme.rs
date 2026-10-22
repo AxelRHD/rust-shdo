@@ -13,6 +13,19 @@ pub const DEFAULT_THEME: &str = "tokyonight";
 const BUILTIN: &[(&str, &str)] = &[
     ("tokyonight", include_str!("../themes/tokyonight.toml")),
     ("nord", include_str!("../themes/nord.toml")),
+    ("gruvbox-dark", include_str!("../themes/gruvbox-dark.toml")),
+    (
+        "catppuccin-mocha",
+        include_str!("../themes/catppuccin-mocha.toml"),
+    ),
+    (
+        "gruvbox-light",
+        include_str!("../themes/gruvbox-light.toml"),
+    ),
+    (
+        "catppuccin-latte",
+        include_str!("../themes/catppuccin-latte.toml"),
+    ),
     ("terminal", include_str!("../themes/terminal.toml")),
 ];
 
@@ -98,7 +111,12 @@ fn fallback() -> Palette {
         key: Color::Magenta,
         warn: Color::Yellow,
     };
-    let base: ThemeFile = toml::from_str(BUILTIN[0].1).expect("Default-Theme ist gültig");
+    let raw = BUILTIN
+        .iter()
+        .find(|(id, _)| *id == DEFAULT_THEME)
+        .map(|(_, raw)| *raw)
+        .expect("Default-Theme ist eingebaut");
+    let base: ThemeFile = toml::from_str(raw).expect("Default-Theme ist gültig");
     p.apply(&base.colors).expect("Default-Theme ist gültig");
     p
 }
@@ -114,7 +132,7 @@ fn parse_theme(id: &str, raw: &str) -> Result<Theme> {
     })
 }
 
-/// Alle Themes: eingebaute zuerst, danach eigene (gleiche ID überschreibt).
+/// Alle Themes alphabetisch nach Name: eingebaute und eigene (gleiche ID überschreibt).
 /// Fehlerhafte eigene Themes landen als Warnung im zweiten Wert.
 pub fn load_all(custom_dir: &Path) -> (Vec<Theme>, Vec<String>) {
     let mut themes: Vec<Theme> = BUILTIN
@@ -144,6 +162,7 @@ pub fn load_all(custom_dir: &Path) -> (Vec<Theme>, Vec<String>) {
             Err(e) => warnings.push(format!("Theme {}: {e:#}", path.display())),
         }
     }
+    themes.sort_by_key(|t| t.name.to_lowercase());
     (themes, warnings)
 }
 
@@ -156,11 +175,19 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let (themes, warnings) = load_all(tmp.path());
         assert!(warnings.is_empty());
-        assert_eq!(themes[0].id, DEFAULT_THEME);
-        assert_eq!(themes[0].c.bg, Color::Rgb(0x1a, 0x1b, 0x26));
-        assert_eq!(themes[1].id, "nord");
-        assert_eq!(themes[1].c.bg, Color::Rgb(0x2e, 0x34, 0x40));
-        assert_eq!(themes[2].c.bg, Color::Reset);
+        let names: Vec<&str> = themes.iter().map(|t| t.name.as_str()).collect();
+        let mut sorted = names.clone();
+        sorted.sort_by_key(|n| n.to_lowercase());
+        assert_eq!(names, sorted);
+        let by_id = |id: &str| themes.iter().find(|t| t.id == id).unwrap();
+        assert_eq!(by_id(DEFAULT_THEME).c.bg, Color::Rgb(0x1a, 0x1b, 0x26));
+        assert_eq!(by_id("nord").c.bg, Color::Rgb(0x2e, 0x34, 0x40));
+        assert_eq!(by_id("terminal").c.bg, Color::Reset);
+        // Jedes eingebaute Theme setzt alle Tokens selbst (nichts erbt still vom Default).
+        for (id, raw) in BUILTIN {
+            let file: ThemeFile = toml::from_str(raw).unwrap();
+            assert_eq!(file.colors.len(), 15, "{id}");
+        }
     }
 
     #[test]
@@ -177,7 +204,8 @@ mod tests {
         let mein = themes.iter().find(|t| t.id == "mein").unwrap();
         assert_eq!(mein.name, "mein");
         assert_eq!(mein.c.bg, Color::Rgb(0, 0, 0));
-        assert_eq!(mein.c.fg, themes[0].c.fg);
+        let default = themes.iter().find(|t| t.id == DEFAULT_THEME).unwrap();
+        assert_eq!(mein.c.fg, default.c.fg);
         assert_eq!(warnings.len(), 2);
     }
 }

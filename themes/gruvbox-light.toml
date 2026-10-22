@@ -1,0 +1,19 @@
+# Gruvbox Light – https://github.com/morhetz/gruvbox
+name = "Gruvbox Light"
+
+[colors]
+bg = "#fbf1c7"            # bg0
+fg = "#3c3836"            # fg1
+dim = "#928374"           # gray
+border = "#d5c4a1"        # bg2
+border_active = "#79740e" # green
+title = "#076678"         # blue
+accent = "#427b58"        # aqua
+selection = "#ebdbb2"     # bg1
+prio_high = "#9d0006"     # red
+prio_low = "#928374"
+overdue = "#9d0006"
+today = "#b57614"         # yellow
+done = "#79740e"
+key = "#8f3f71"           # purple
+warn = "#af3a03"          # orange
