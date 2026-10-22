@@ -107,6 +107,7 @@ them.
 | `v` / `c` | show or hide the done column / the calendar |
 | `s` | sync with the git remote |
 | `t` | choose a theme |
+| `,` | open the settings (config.toml) in your editor |
 | `q` | quit |
 
 ## Command line

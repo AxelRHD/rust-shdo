@@ -148,6 +148,8 @@ pub struct App {
     /// The sync on quit failed: the next quit leaves without syncing.
     skip_sync_on_quit: bool,
     pub editor_request: Option<PathBuf>,
+    /// Open config.toml in the editor and apply it afterwards.
+    pub config_request: bool,
 }
 
 impl App {
@@ -206,11 +208,48 @@ impl App {
             sync_rx: None,
             quit: false,
             editor_request: None,
+            config_request: false,
         })
     }
 
     pub fn theme(&self) -> &Theme {
         &self.themes[self.theme]
+    }
+
+    pub fn cfg_path(&self) -> &std::path::Path {
+        &self.cfg_path
+    }
+
+    /// Re-reads config.toml after it was edited and applies it to the running board.
+    /// A changed data directory only takes effect on the next start.
+    pub fn reload_config(&mut self) {
+        let cfg = match AppConfig::load(&self.cfg_path) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                self.set_status(Level::Error, format!("{e:#}"));
+                return;
+            }
+        };
+        crate::i18n::set(cfg.lang());
+        let dir_changed = cfg.dir != self.cfg.dir;
+        let keep = self.selected_id();
+        let store = Store::new(self.store.dir.clone());
+        match App::new(store, cfg, self.cfg_path.clone()) {
+            Ok(mut fresh) => {
+                fresh.col = self.col;
+                fresh.rows = std::mem::take(&mut self.rows);
+                fresh.filter.query = std::mem::take(&mut self.filter.query);
+                fresh.sync_rx = self.sync_rx.take();
+                *self = fresh;
+                self.reload(keep);
+                let mut msg = t!("msg.settings_applied").into_owned();
+                if dir_changed {
+                    msg.push_str(&format!(" – {}", t!("msg.dir_next_start")));
+                }
+                self.set_status(Level::Ok, msg);
+            }
+            Err(e) => self.set_status(Level::Error, format!("{e:#}")),
+        }
     }
 
     pub fn editor(&self) -> String {
@@ -528,6 +567,7 @@ impl App {
                 }
             }
             KeyCode::Char('?') => self.mode = Mode::Help { scroll: 0 },
+            KeyCode::Char(',') => self.config_request = true,
             _ => {}
         }
     }

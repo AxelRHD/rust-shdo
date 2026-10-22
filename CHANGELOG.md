@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- `,` opens the settings (config.toml) in the editor; changes apply when the editor
+  closes (the data directory on the next start)
+- The help lists where settings, tasks and custom themes live, `shdo setup`, and
+  `Ctrl+C`
+- The setup dialog puts the cursor on the input line when the text above wraps
+
 ## 0.2.0 - 2026-10-22
 
 - Live search with `/` in titles, notes and IDs; works together with the bucket filter

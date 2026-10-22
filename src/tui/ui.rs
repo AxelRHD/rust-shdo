@@ -78,8 +78,10 @@ const HELP: &[(&str, &[(&str, &str)])] = &[
             ("v", "help.general.done_column"),
             ("c", "help.general.calendar"),
             ("t", "help.general.theme"),
+            (",", "help.general.settings"),
             ("?", "help.general.help"),
             ("q / Esc", "help.general.quit"),
+            ("Ctrl+C", "help.general.ctrl_c"),
             ("", "help.general.esc_search"),
         ],
     ),
@@ -547,6 +549,7 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
             k.extend([
                 ("s", "kb.sync"),
                 ("t", "kb.theme"),
+                (",", "kb.settings"),
                 ("?", "kb.help"),
                 ("q", "kb.quit"),
             ]);
@@ -663,6 +666,30 @@ fn draw_help(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
         }
         lines.push(Line::default());
     }
+    // Where things live, with the real paths of this machine
+    lines.push(Line::from(Span::styled(
+        t!("help.files").into_owned(),
+        Style::new().fg(c.title).bold(),
+    )));
+    let files = [
+        ("help.files.config", tilde_path(app.cfg_path())),
+        ("help.files.data", tilde_path(&app.store.dir)),
+        (
+            "help.files.themes",
+            tilde_path(&crate::config::config_dir().join("themes")),
+        ),
+    ];
+    for (k, path) in files {
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {:<16}", t!(k)), Style::new().fg(c.key)),
+            Span::raw(path),
+        ]));
+    }
+    lines.push(Line::from(vec![
+        Span::styled(format!("  {:<16}", "shdo setup"), Style::new().fg(c.key)),
+        Span::raw(t!("help.files.setup").into_owned()),
+    ]));
+    lines.push(Line::default());
     let warnings: Vec<_> = app.warnings().collect();
     if !warnings.is_empty() {
         lines.push(Line::from(Span::styled(

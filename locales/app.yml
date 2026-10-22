@@ -1015,3 +1015,33 @@ msg.sync_before_quit:
 msg.quit_without_sync:
   en: "q quits without syncing"
   de: "q beendet ohne Sync"
+kb.settings:
+  en: "settings"
+  de: "Einstellungen"
+help.general.settings:
+  en: "open settings (config.toml) in the editor, applied on close"
+  de: "Einstellungen (config.toml) im Editor öffnen, beim Schließen übernommen"
+help.general.ctrl_c:
+  en: "quit immediately, without auto-sync"
+  de: "sofort beenden, ohne Auto-Sync"
+help.files:
+  en: "Files"
+  de: "Dateien"
+help.files.config:
+  en: "settings"
+  de: "Einstellungen"
+help.files.data:
+  en: "tasks"
+  de: "Tasks"
+help.files.themes:
+  en: "own themes"
+  de: "eigene Themes"
+help.files.setup:
+  en: "setup dialog again (language, directory, holidays)"
+  de: "Einrichtungsdialog erneut (Sprache, Verzeichnis, Feiertage)"
+msg.settings_applied:
+  en: "settings applied"
+  de: "Einstellungen übernommen"
+msg.dir_next_start:
+  en: "the new data directory is used on the next start"
+  de: "das neue Datenverzeichnis gilt ab dem nächsten Start"

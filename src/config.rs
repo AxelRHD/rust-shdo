@@ -133,6 +133,19 @@ impl AppConfig {
     }
 }
 
+/// Creates the config file from the commented template if it does not exist yet,
+/// so it can be opened in an editor.
+pub fn ensure_file(path: &Path) -> Result<()> {
+    if path.exists() {
+        return Ok(());
+    }
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    fs::write(path, DEFAULT_CONFIG)
+        .with_context(|| t!("io.write", path = path.display()).into_owned())
+}
+
 /// Sets a string value in the config file; comments and other values are preserved.
 pub fn set_value(path: &Path, key: &str, val: &str) -> Result<()> {
     update(path, |doc| doc[key] = value(val))

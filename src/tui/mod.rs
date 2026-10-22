@@ -81,6 +81,16 @@ fn event_loop(terminal: &mut DefaultTerminal, app: &mut App) -> Result<()> {
             let res = with_suspended(terminal, || crate::open_editor(&app.editor(), &path));
             app.after_editor(path, res);
         }
+        if std::mem::take(&mut app.config_request) {
+            let path = app.cfg_path().to_path_buf();
+            let res = crate::config::ensure_file(&path).and_then(|()| {
+                with_suspended(terminal, || crate::open_editor(&app.editor(), &path))
+            });
+            match res {
+                Ok(()) => app.reload_config(),
+                Err(e) => app.after_editor(path, Err(e)),
+            }
+        }
     }
     Ok(())
 }
