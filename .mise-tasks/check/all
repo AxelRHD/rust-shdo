@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="fmt, clippy und Tests – vor jedem Commit"
+#MISE depends=["check:fmt", "check:clippy", "test"]
+set -euo pipefail
+echo "✅ alles grün"

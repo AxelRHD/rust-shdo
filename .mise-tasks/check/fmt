@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Formatierung prüfen (cargo fmt --check)"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT"
+cargo fmt --check
+echo "✅ fmt"

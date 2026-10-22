@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Code formatieren"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT"
+cargo fmt
+echo "✅ formatiert"

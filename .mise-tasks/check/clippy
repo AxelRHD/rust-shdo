@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Clippy ohne Warnungen (inkl. Tests)"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT"
+cargo clippy --all-targets -q -- -D warnings
+echo "✅ clippy"

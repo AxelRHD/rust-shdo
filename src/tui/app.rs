@@ -1,0 +1,723 @@
+//! App-State und Aktionen der TUI.
+
+use std::path::PathBuf;
+use std::sync::mpsc::{self, Receiver};
+
+use anyhow::Result;
+use jiff::Zoned;
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+use super::form::{Form, Input};
+use crate::board::{self, Board, Filter, NO_BUCKET};
+use crate::config::{self, AppConfig};
+use crate::git::Git;
+use crate::store::{ColumnDef, Store};
+use crate::task::{PRIO_DEFAULT, Task};
+use crate::theme::{self, Theme};
+use crate::{dates, quickadd};
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum InputKind {
+    Rename,
+    Due,
+}
+
+impl InputKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            InputKind::Rename => "Titel",
+            InputKind::Due => "Fällig",
+        }
+    }
+}
+
+pub enum Mode {
+    Normal,
+    Input {
+        kind: InputKind,
+        input: Input,
+    },
+    Form(Box<Form>),
+    ConfirmDelete,
+    Help {
+        scroll: u16,
+    },
+    Themes {
+        idx: usize,
+        original: usize,
+    },
+    Detail {
+        scroll: u16,
+    },
+    /// Einträge: Buckets in Reihenfolge von `shdo.toml`, zuletzt „ohne Bucket“.
+    Filter {
+        idx: usize,
+        checked: Vec<bool>,
+        original: Filter,
+    },
+    /// 0 = ohne Bucket, sonst Index + 1.
+    PickBucket {
+        idx: usize,
+    },
+}
+
+#[derive(Clone, Copy)]
+pub enum Level {
+    Info,
+    Ok,
+    Error,
+}
+
+pub struct App {
+    pub store: Store,
+    cfg: AppConfig,
+    cfg_path: PathBuf,
+    pub board: Board,
+    filter: Filter,
+    pub col: usize,
+    pub rows: Vec<usize>,
+    /// Scroll-Offset je Spalte (in Karten), wird beim Rendern nachgeführt.
+    pub offsets: Vec<usize>,
+    /// Erste sichtbare Spalte, falls nicht alle Spalten nebeneinander passen.
+    pub col_offset: usize,
+    pub mode: Mode,
+    pub status: Option<(Level, String)>,
+    pub themes: Vec<Theme>,
+    pub theme: usize,
+    pub theme_warnings: Vec<String>,
+    fingerprint: u64,
+    sync_rx: Option<Receiver<Result<String>>>,
+    pub quit: bool,
+    pub editor_request: Option<PathBuf>,
+}
+
+impl App {
+    pub fn new(store: Store, cfg: AppConfig, cfg_path: PathBuf) -> Result<App> {
+        let (themes, theme_warnings) = theme::load_all(&config::config_dir().join("themes"));
+        let wanted = cfg.theme.as_deref().unwrap_or(theme::DEFAULT_THEME);
+        let mut theme_warnings = theme_warnings;
+        let theme = themes
+            .iter()
+            .position(|t| t.id == wanted)
+            .unwrap_or_else(|| {
+                theme_warnings.push(format!("Theme „{wanted}“ nicht gefunden"));
+                0
+            });
+        let filter = Filter {
+            buckets: cfg.buckets.clone(),
+        };
+        let board = Board::load(&store, &filter)?;
+        let n = board.columns.len();
+        Ok(App {
+            fingerprint: store.fingerprint(),
+            store,
+            cfg,
+            cfg_path,
+            board,
+            filter,
+            col: 0,
+            rows: vec![0; n],
+            offsets: vec![0; n],
+            col_offset: 0,
+            mode: Mode::Normal,
+            status: None,
+            themes,
+            theme,
+            theme_warnings,
+            sync_rx: None,
+            quit: false,
+            editor_request: None,
+        })
+    }
+
+    pub fn theme(&self) -> &Theme {
+        &self.themes[self.theme]
+    }
+
+    pub fn editor(&self) -> String {
+        self.cfg.editor()
+    }
+
+    pub fn warnings(&self) -> impl Iterator<Item = &String> {
+        self.board.warnings.iter().chain(&self.theme_warnings)
+    }
+
+    pub fn syncing(&self) -> bool {
+        self.sync_rx.is_some()
+    }
+
+    pub fn selected(&self) -> Option<&Task> {
+        self.board
+            .columns
+            .get(self.col)?
+            .tasks
+            .get(self.rows[self.col])
+    }
+
+    fn selected_id(&self) -> Option<String> {
+        self.selected().map(|t| t.id.clone())
+    }
+
+    fn defs(&self) -> Vec<ColumnDef> {
+        self.board.columns.iter().map(|c| c.def.clone()).collect()
+    }
+
+    fn set_status(&mut self, level: Level, msg: impl Into<String>) {
+        self.status = Some((level, msg.into()));
+    }
+
+    fn report(&mut self, res: Result<()>, ok: impl Into<String>) {
+        match res {
+            Ok(()) => self.set_status(Level::Ok, ok),
+            Err(e) => self.set_status(Level::Error, format!("{e:#}")),
+        }
+    }
+
+    /// Board neu laden; `follow` wählt danach diese Karte aus (Spalte wechselt mit).
+    pub fn reload(&mut self, follow: Option<String>) {
+        match Board::load(&self.store, &self.filter) {
+            Ok(b) => self.board = b,
+            Err(e) => {
+                self.set_status(Level::Error, format!("{e:#}"));
+                return;
+            }
+        }
+        self.fingerprint = self.store.fingerprint();
+        let n = self.board.columns.len();
+        self.rows.resize(n, 0);
+        self.offsets.resize(n, 0);
+        self.col = self.col.min(n - 1);
+        if let Some((c, r)) = follow.and_then(|id| self.board.find(&id)) {
+            self.col = c;
+            self.rows[c] = r;
+        }
+        for (c, col) in self.board.columns.iter().enumerate() {
+            self.rows[c] = self.rows[c].min(col.tasks.len().saturating_sub(1));
+        }
+    }
+
+    /// Regelmäßig aufgerufen: Sync-Ergebnis abholen, externe Änderungen erkennen.
+    pub fn tick(&mut self) {
+        if let Some(rx) = &self.sync_rx
+            && let Ok(res) = rx.try_recv()
+        {
+            self.sync_rx = None;
+            let keep = self.selected_id();
+            self.reload(keep);
+            match res {
+                Ok(msg) => self.set_status(Level::Ok, format!("Sync: {msg}")),
+                Err(e) => self.set_status(Level::Error, format!("Sync: {e:#}")),
+            }
+        }
+        if matches!(
+            self.mode,
+            Mode::Normal | Mode::Help { .. } | Mode::Themes { .. }
+        ) && self.store.fingerprint() != self.fingerprint
+        {
+            let keep = self.selected_id();
+            self.reload(keep);
+        }
+    }
+
+    pub fn after_editor(&mut self, path: PathBuf, res: Result<()>) {
+        let keep = self.selected_id();
+        self.reload(keep);
+        match res.and_then(|()| Task::load(&path).map(|_| ())) {
+            Ok(()) => self.set_status(Level::Ok, "gespeichert"),
+            Err(e) => self.set_status(Level::Error, format!("{}: {e:#}", path.display())),
+        }
+    }
+
+    pub fn handle_key(&mut self, key: KeyEvent) {
+        if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+            self.quit = true;
+            return;
+        }
+        match std::mem::replace(&mut self.mode, Mode::Normal) {
+            Mode::Normal => self.normal_key(key),
+            Mode::Input { kind, mut input } => match key.code {
+                KeyCode::Esc => {}
+                KeyCode::Enter => {
+                    if !self.submit_input(kind, &input.text) {
+                        self.mode = Mode::Input { kind, input };
+                    }
+                }
+                _ => {
+                    input.handle(key);
+                    self.mode = Mode::Input { kind, input };
+                }
+            },
+            Mode::Form(mut form) => match key.code {
+                KeyCode::Esc => self.set_status(Level::Info, "verworfen"),
+                KeyCode::Enter => {
+                    if let Err(e) = self.submit_form(&form) {
+                        self.set_status(Level::Error, format!("{e:#}"));
+                        self.mode = Mode::Form(form);
+                    }
+                }
+                _ => {
+                    self.status = None;
+                    form.handle(key);
+                    self.mode = Mode::Form(form);
+                }
+            },
+            Mode::ConfirmDelete => {
+                if matches!(key.code, KeyCode::Char('j' | 'J' | 'y' | 'Y')) {
+                    self.delete();
+                } else {
+                    self.set_status(Level::Info, "nicht gelöscht");
+                }
+            }
+            Mode::Help { scroll } => match key.code {
+                KeyCode::Char('j') | KeyCode::Down => self.mode = Mode::Help { scroll: scroll + 1 },
+                KeyCode::Char('k') | KeyCode::Up => {
+                    self.mode = Mode::Help {
+                        scroll: scroll.saturating_sub(1),
+                    }
+                }
+                _ => {}
+            },
+            Mode::Themes { idx, original } => self.themes_key(key, idx, original),
+            Mode::Detail { scroll } => match key.code {
+                KeyCode::Char('j') | KeyCode::Down => {
+                    self.mode = Mode::Detail { scroll: scroll + 1 }
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    self.mode = Mode::Detail {
+                        scroll: scroll.saturating_sub(1),
+                    }
+                }
+                KeyCode::Char('e') => self.request_editor(),
+                KeyCode::Char('E') => self.open_edit_form(),
+                _ => {}
+            },
+            Mode::Filter {
+                idx,
+                checked,
+                original,
+            } => self.filter_key(key, idx, checked, original),
+            Mode::PickBucket { idx } => self.pick_bucket_key(key, idx),
+        }
+    }
+
+    fn normal_key(&mut self, key: KeyEvent) {
+        let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+        self.status = None;
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => self.quit = true,
+            KeyCode::Char('H') => self.move_selected(-1),
+            KeyCode::Char('L') => self.move_selected(1),
+            KeyCode::Left if shift => self.move_selected(-1),
+            KeyCode::Right if shift => self.move_selected(1),
+            KeyCode::Char('h') | KeyCode::Left => self.col = self.col.saturating_sub(1),
+            KeyCode::Char('l') | KeyCode::Right => {
+                self.col = (self.col + 1).min(self.board.columns.len() - 1)
+            }
+            KeyCode::Char('j') | KeyCode::Down => self.step(1),
+            KeyCode::Char('k') | KeyCode::Up => self.step(-1),
+            KeyCode::Char('g') | KeyCode::Home => self.rows[self.col] = 0,
+            KeyCode::Char('G') | KeyCode::End => self.step(isize::MAX),
+            KeyCode::Char('n') => {
+                self.mode = Mode::Form(Box::new(Form::new_task(&self.board, self.col)))
+            }
+            KeyCode::Char('E') => self.open_edit_form(),
+            KeyCode::Char('r') => {
+                if let Some(t) = self.selected() {
+                    let input = Input::with(&t.title);
+                    self.mode = Mode::Input {
+                        kind: InputKind::Rename,
+                        input,
+                    };
+                }
+            }
+            KeyCode::Char('D') => {
+                if let Some(t) = self.selected() {
+                    let input = Input::with(&t.due.map(|d| d.to_string()).unwrap_or_default());
+                    self.mode = Mode::Input {
+                        kind: InputKind::Due,
+                        input,
+                    };
+                }
+            }
+            KeyCode::Char(c @ '1'..='3') => self.set_prio(c as u8 - b'0'),
+            KeyCode::Char('x') => self.toggle_done(),
+            KeyCode::Char('d') => {
+                if self.selected().is_some() {
+                    self.mode = Mode::ConfirmDelete;
+                }
+            }
+            KeyCode::Char('e') => self.request_editor(),
+            KeyCode::Enter => {
+                if self.selected().is_some() {
+                    self.mode = Mode::Detail { scroll: 0 };
+                }
+            }
+            KeyCode::Char('f') => self.open_filter(),
+            KeyCode::Char('b') => self.open_pick_bucket(),
+            KeyCode::Char('s') => self.start_sync(),
+            KeyCode::Char('R') => {
+                let keep = self.selected_id();
+                self.reload(keep);
+                self.set_status(Level::Info, "neu geladen");
+            }
+            KeyCode::Char('t') => {
+                self.mode = Mode::Themes {
+                    idx: self.theme,
+                    original: self.theme,
+                }
+            }
+            KeyCode::Char('?') => self.mode = Mode::Help { scroll: 0 },
+            _ => {}
+        }
+    }
+
+    fn step(&mut self, delta: isize) {
+        let len = self.board.columns[self.col].tasks.len();
+        if len == 0 {
+            return;
+        }
+        let row = self.rows[self.col] as isize;
+        self.rows[self.col] = row.saturating_add(delta).clamp(0, len as isize - 1) as usize;
+    }
+
+    /// Wendet `f` auf die selektierte Karte an, speichert und lädt neu.
+    fn edit_selected(&mut self, ok: &str, f: impl FnOnce(&mut Task)) {
+        let Some(mut task) = self.selected().cloned() else {
+            return;
+        };
+        f(&mut task);
+        let res = task.save();
+        self.reload(Some(task.id.clone()));
+        self.report(res, ok);
+    }
+
+    fn move_selected(&mut self, delta: isize) {
+        let target = self.col as isize + delta;
+        if target < 0 || target as usize >= self.board.columns.len() {
+            return;
+        }
+        let Some(mut task) = self.selected().cloned() else {
+            return;
+        };
+        let defs = self.defs();
+        let res = board::move_task(&mut task, &defs, target as usize, &Zoned::now());
+        self.reload(Some(task.id.clone()));
+        self.report(res, format!("→ {}", defs[target as usize].name));
+    }
+
+    /// Erledigt bzw. wieder offen (erste Spalte); die Auswahl bleibt in der Spalte.
+    fn toggle_done(&mut self) {
+        let Some(mut task) = self.selected().cloned() else {
+            return;
+        };
+        let defs = self.defs();
+        let last = defs.len() - 1;
+        let target = if self.col == last { 0 } else { last };
+        let res = board::move_task(&mut task, &defs, target, &Zoned::now());
+        self.reload(None);
+        self.report(res, format!("{} → {}", task.title, defs[target].name));
+    }
+
+    fn set_prio(&mut self, prio: u8) {
+        self.edit_selected(&format!("Prio {prio}"), |t| t.set_prio(Some(prio)));
+    }
+
+    fn delete(&mut self) {
+        let Some(task) = self.selected().cloned() else {
+            return;
+        };
+        let res = self.store.delete(&task);
+        self.reload(None);
+        self.report(res, format!("gelöscht: {}", task.title));
+    }
+
+    /// Gibt `false` zurück, wenn die Eingabe ungültig ist und offen bleiben soll.
+    fn submit_input(&mut self, kind: InputKind, text: &str) -> bool {
+        let today = dates::today();
+        match kind {
+            InputKind::Rename => {
+                let title = text.trim().to_string();
+                if title.is_empty() {
+                    self.set_status(Level::Error, "Titel darf nicht leer sein");
+                    return false;
+                }
+                self.edit_selected("umbenannt", |t| t.set_title(&title));
+            }
+            InputKind::Due => {
+                let due = if text.trim().is_empty() {
+                    None
+                } else {
+                    match dates::parse_date(text, today) {
+                        Ok(d) => Some(d),
+                        Err(e) => {
+                            self.set_status(Level::Error, format!("{e:#}"));
+                            return false;
+                        }
+                    }
+                };
+                let msg = match due {
+                    Some(d) => format!("fällig {}", dates::fmt_due(d, today)),
+                    None => "Fälligkeit entfernt".into(),
+                };
+                self.edit_selected(&msg, |t| t.set_due(due));
+            }
+        }
+        true
+    }
+
+    fn open_edit_form(&mut self) {
+        if let Some(t) = self.selected() {
+            self.mode = Mode::Form(Box::new(Form::edit_task(&self.board, t)));
+        }
+    }
+
+    /// Speichert das Formular. Tokens im Titel (`P1`, `due:…`, `@…`) haben Vorrang vor den Feldern.
+    fn submit_form(&mut self, form: &Form) -> Result<()> {
+        let today = dates::today();
+        let q = quickadd::parse_str(&form.title.text, today)?;
+        let due = match q.due {
+            Some(d) => Some(d),
+            None if form.due.text.trim().is_empty() => None,
+            None => Some(dates::parse_date(&form.due.text, today)?),
+        };
+        let bucket = match &q.bucket {
+            Some(raw) => Some(board::resolve_bucket(&self.board.buckets, raw)?),
+            None => form.bucket_key().map(String::from),
+        };
+        let prio = q.prio.unwrap_or(form.prio);
+        let defs = self.defs();
+        let now = Zoned::now();
+
+        let (mut task, is_new) = match &form.editing {
+            None => (self.store.create(&q.title, &defs[0].key, &now), true),
+            Some(id) => (self.store.find(id)?, false),
+        };
+        task.set_title(&q.title);
+        // Normale Prio nur schreiben, wenn sie schon explizit gesetzt war.
+        if prio != PRIO_DEFAULT || task.prio.is_some() {
+            task.set_prio(Some(prio));
+        }
+        task.set_due(due);
+        task.set_bucket(bucket.as_deref());
+        if form.note_editable {
+            task.set_note(&form.note.text);
+        }
+        task.move_to(&defs[form.column].key, form.column == defs.len() - 1, &now);
+        task.save()?;
+
+        let id = task.id.clone();
+        self.reload(Some(id.clone()));
+        let mut msg = format!(
+            "{}: {}",
+            if is_new { "angelegt" } else { "gespeichert" },
+            task.title
+        );
+        if let Some(b) = &bucket {
+            msg.push_str(&format!(" @{b}"));
+            if form.inherited && q.bucket.is_none() {
+                msg.push_str(" (aus Filter)");
+            }
+        }
+        if self.board.find(&id).is_none() {
+            msg.push_str(" – durch den Filter ausgeblendet");
+        }
+        self.set_status(Level::Ok, msg);
+        Ok(())
+    }
+
+    fn request_editor(&mut self) {
+        if let Some(t) = self.selected() {
+            self.editor_request = Some(t.path.clone());
+        }
+    }
+
+    fn start_sync(&mut self) {
+        if self.syncing() {
+            return;
+        }
+        let (tx, rx) = mpsc::channel();
+        let dir = self.store.dir.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(Git::new(&dir, true).sync());
+        });
+        self.sync_rx = Some(rx);
+        self.set_status(Level::Info, "Sync läuft …");
+    }
+
+    fn no_buckets(&mut self) -> bool {
+        if self.board.buckets.is_empty() {
+            self.set_status(
+                Level::Info,
+                "keine Buckets definiert – siehe [[buckets]] in shdo.toml",
+            );
+            return true;
+        }
+        false
+    }
+
+    fn open_filter(&mut self) {
+        if self.no_buckets() {
+            return;
+        }
+        let f = &self.board.filter;
+        let mut checked: Vec<bool> = self
+            .board
+            .buckets
+            .iter()
+            .map(|b| f.is_all() || f.buckets.contains(&b.key))
+            .collect();
+        checked.push(f.is_all() || f.buckets.iter().any(|b| b == NO_BUCKET));
+        self.mode = Mode::Filter {
+            idx: 0,
+            checked,
+            original: self.filter.clone(),
+        };
+    }
+
+    fn filter_from(&self, checked: &[bool]) -> Filter {
+        let n = self.board.buckets.len();
+        let buckets = checked
+            .iter()
+            .enumerate()
+            .filter(|&(_, &on)| on)
+            .map(|(i, _)| {
+                if i == n {
+                    NO_BUCKET.to_string()
+                } else {
+                    self.board.buckets[i].key.clone()
+                }
+            })
+            .collect();
+        Filter { buckets }.normalized(&self.board.buckets)
+    }
+
+    /// Filter sofort anwenden (Live-Vorschau), Auswahl bleibt auf der Karte, falls sichtbar.
+    fn apply_filter(&mut self, filter: Filter) {
+        self.filter = filter;
+        let keep = self.selected_id();
+        self.reload(keep);
+    }
+
+    fn filter_key(&mut self, key: KeyEvent, idx: usize, mut checked: Vec<bool>, original: Filter) {
+        let n = checked.len();
+        let mut idx = idx;
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => idx = (idx + 1) % n,
+            KeyCode::Char('k') | KeyCode::Up => idx = (idx + n - 1) % n,
+            KeyCode::Char(' ') | KeyCode::Char('x') => {
+                checked[idx] = !checked[idx];
+                if checked.iter().any(|&c| c) {
+                    let f = self.filter_from(&checked);
+                    self.apply_filter(f);
+                }
+            }
+            KeyCode::Char('a') => {
+                let on = !checked.iter().all(|&c| c);
+                checked.iter_mut().for_each(|c| *c = on);
+                if on {
+                    self.apply_filter(Filter::all());
+                }
+            }
+            KeyCode::Char('o') => {
+                // nur diesen einen
+                checked
+                    .iter_mut()
+                    .enumerate()
+                    .for_each(|(i, c)| *c = i == idx);
+                let f = self.filter_from(&checked);
+                self.apply_filter(f);
+            }
+            KeyCode::Enter => {
+                let f = if checked.iter().any(|&c| c) {
+                    self.filter_from(&checked)
+                } else {
+                    Filter::all()
+                };
+                self.apply_filter(f.clone());
+                let res = config::set_list(&self.cfg_path, "buckets", &f.buckets);
+                let label = self.board.filter_label().unwrap_or_else(|| "alle".into());
+                self.report(res, format!("Filter: {label}"));
+                return;
+            }
+            KeyCode::Esc | KeyCode::Char('q') => {
+                self.apply_filter(original);
+                return;
+            }
+            _ => {}
+        }
+        self.mode = Mode::Filter {
+            idx,
+            checked,
+            original,
+        };
+    }
+
+    fn open_pick_bucket(&mut self) {
+        if self.no_buckets() {
+            return;
+        }
+        let Some(t) = self.selected() else { return };
+        let idx = t
+            .bucket
+            .as_ref()
+            .and_then(|b| self.board.buckets.iter().position(|d| &d.key == b))
+            .map_or(0, |i| i + 1);
+        self.mode = Mode::PickBucket { idx };
+    }
+
+    fn pick_bucket_key(&mut self, key: KeyEvent, idx: usize) {
+        let n = self.board.buckets.len() + 1;
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.mode = Mode::PickBucket { idx: (idx + 1) % n }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.mode = Mode::PickBucket {
+                    idx: (idx + n - 1) % n,
+                }
+            }
+            KeyCode::Enter => {
+                let bucket = idx
+                    .checked_sub(1)
+                    .map(|i| self.board.buckets[i].key.clone());
+                let msg = match &bucket {
+                    Some(b) => format!("Bucket: {}", self.board.bucket_name(b)),
+                    None => "ohne Bucket".into(),
+                };
+                let id = self.selected_id();
+                self.edit_selected(&msg, |t| t.set_bucket(bucket.as_deref()));
+                if let Some(id) = id
+                    && self.board.find(&id).is_none()
+                {
+                    self.set_status(Level::Ok, format!("{msg} – durch den Filter ausgeblendet"));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn themes_key(&mut self, key: KeyEvent, idx: usize, original: usize) {
+        let n = self.themes.len();
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                let idx = (idx + 1) % n;
+                self.theme = idx;
+                self.mode = Mode::Themes { idx, original };
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                let idx = (idx + n - 1) % n;
+                self.theme = idx;
+                self.mode = Mode::Themes { idx, original };
+            }
+            KeyCode::Enter => {
+                self.theme = idx;
+                let id = self.themes[idx].id.clone();
+                let res = config::set_value(&self.cfg_path, "theme", &id);
+                let name = self.themes[idx].name.clone();
+                self.report(res, format!("Theme: {name}"));
+            }
+            KeyCode::Esc | KeyCode::Char('q') => self.theme = original,
+            _ => self.mode = Mode::Themes { idx, original },
+        }
+    }
+}

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="Release bauen und nach ~/.cargo/bin installieren"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT"
+echo "🏗️  Installiere shdo …"
+cargo install --path . --locked -q
+echo "✅ $(command -v shdo)"

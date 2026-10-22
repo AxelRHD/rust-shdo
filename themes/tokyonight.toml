@@ -1,0 +1,19 @@
+# Tokyo Night – https://github.com/folke/tokyonight.nvim
+name = "Tokyo Night"
+
+[colors]
+bg = "#1a1b26"
+fg = "#c0caf5"
+dim = "#565f89"
+border = "#3b4261"
+border_active = "#9ece6a"
+title = "#7aa2f7"
+accent = "#7dcfff"
+selection = "#283457"
+prio_high = "#f7768e"
+prio_low = "#565f89"
+overdue = "#f7768e"
+today = "#e0af68"
+done = "#9ece6a"
+key = "#bb9af7"
+warn = "#e0af68"

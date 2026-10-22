@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Tests ausführen (Argumente gehen an cargo test)"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT"
+cargo test -q "$@"
