@@ -1,5 +1,7 @@
 # shdo
 
+[![CI](https://github.com/AxelRHD/rust-shdo/actions/workflows/ci.yml/badge.svg)](https://github.com/AxelRHD/rust-shdo/actions/workflows/ci.yml)
+
 **A kanban board for your terminal. Every task is a Markdown file in a git repository.**
 
 shdo opens straight into a board, shows every available key at the bottom of the
@@ -62,7 +64,7 @@ just files you can read, edit and diff.
 
 ## Installation
 
-shdo needs a recent stable Rust toolchain and `git`. Until the first release on
+shdo needs Rust 1.89 or newer and `git`. Until the first release on
 crates.io, install it from source:
 
 ```sh
