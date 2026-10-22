@@ -1,0 +1,207 @@
+# shdo
+
+**A kanban board for your terminal. Every task is a Markdown file in a git repository.**
+
+shdo opens straight into a board, shows every available key at the bottom of the
+screen and syncs between machines with plain git. No server, no database, no account –
+just files you can read, edit and diff.
+
+```
+ shdo ~/.local/share/shdo                                                                                  [ 8 open ]
+┌Calendar─────────────────┐┌Todo────────────────────────┐┌Doing────────────────────────┐┌Waiting─────────────────────┐
+│      October 2026       ││→ P1 Pay electricity bill   ││  P2 Review pull request     ││  P2 Reply from landlord    │
+│ Wk Su Mo Tu We Th Fr Sa ││     tomorrow · @home       ││     today · @work           ││     since today · @home    │
+│ 40             1  2  3  ││  P1 Quarterly report       ││  P2 Prepare workshop        ││                            │
+│ 41  4  5  6  7  8  9 10 ││     MON 10/26 · ☐ 1/3      ││     WED 10/28 · @work       ││                            │
+│ 42 11 12 13 14 15 16 17 ││  P2 Book flights           ││                             ││                            │
+│ 43 18 19 20 21 22¹23²24 ││     tomorrow · @home       ││                             ││                            │
+│ 44 25 26¹27 28¹29 30 31 ││  P2 Renew passport         ││                             ││                            │
+│                         ││     11/22 · @home          ││                             ││                            │
+│      November 2026      ││  P3 Fix bike light         ││                             ││                            │
+│ Wk Su Mo Tu We Th Fr Sa ││     @home                  ││                             ││                            │
+│ 45  1  2  3  4  5  6  7 ││                            ││                             ││                            │
+│ 46  8  9 10 11 12 13 14 ││                            ││                             ││                            │
+│ 47 15 16 17 18 19 20 21 ││                            ││                             ││                            │
+│ 48 22¹23 24 25 26 27 28 ││                            ││                             ││                            │
+│ 49 29 30                ││                            ││                             ││                            │
+│                         ││                            ││                             ││                            │
+└─────────────────────────┘└──────────────────────1 of 5┘└────────────────────────────2┘└─────────────────────────1 ▸┘
+
+ [h/l → column] [j/k → card] [H/L → move] [n → new] [e → edit] [E → editor] [x → done] [⏎ → details] [f → filter]
+ [b → bucket] [v → done on/off] [c → calendar] [s → sync] [t → theme] [? → help] [q → quit]
+```
+
+## Why shdo?
+
+- **A program, not a pile of commands.** Start `shdo` and you are on your board, with
+  vim-style navigation and a key bar that always tells you what you can do next.
+- **Quick capture from the shell.** `shdo Pay invoice P1 due:fri @work` adds a task
+  without opening anything.
+- **Your data stays yours.** One Markdown file per task with a small TOML header. Edit
+  it in any editor, grep it, keep notes and checklists in it.
+- **Sync without conflicts.** Tasks live in a git repository; `s` (or `shdo sync`)
+  commits, pulls and pushes. One file per task means merge conflicts practically never
+  happen.
+- **Deliberately small.** Statuses, priorities, due dates, buckets and notes. No
+  assignees, projects, tags or story points.
+
+## Features
+
+- Kanban columns per status (Todo, Doing, Waiting, Done – configurable), sorted
+  automatically by priority, due date and age
+- Form for new and edited tasks with a live preview of recognized dates
+- **Buckets** such as *home* and *work*, with a per-machine filter: show work tasks on
+  the work laptop and home tasks at home, from the same repository
+- **Calendar sidebar** with the number of tasks due per day and public holidays
+  (Germany, all federal states)
+- Markdown notes with checklists (`☐ 1/3` on the card)
+- 7 built-in themes – Tokyo Night, Nord, Gruvbox Dark/Light, Catppuccin Mocha/Latte,
+  Terminal – plus your own
+- English and German interface
+- Shell completion, with task IDs, statuses and buckets for fish
+
+## Installation
+
+shdo needs a recent stable Rust toolchain and `git`. Until the first release on
+crates.io, install it from source:
+
+```sh
+git clone https://github.com/AxelRHD/rust-shdo
+cd rust-shdo
+cargo install --path .
+```
+
+After the release this becomes `cargo install shdo`.
+
+## Getting started
+
+Run `shdo`. On the first start a short setup asks for
+
+1. the language of the board (English or German),
+2. the data directory (default `~/.local/share/shdo`; an existing shdo directory is
+   picked up as is),
+3. optionally public holidays for the calendar.
+
+You can change this later with `shdo setup`. To sync between machines, add a remote to
+the data directory once:
+
+```sh
+cd ~/.local/share/shdo
+git remote add origin git@github.com:you/tasks.git
+```
+
+On another machine, clone that repository and point the setup at it.
+
+## The board
+
+The key bar at the bottom always shows the keys for the current view; `?` shows all of
+them.
+
+| Key | Action |
+|-----|--------|
+| `h` `j` `k` `l` / arrows | move between columns and cards |
+| `H` / `L` | move the card to the previous / next status |
+| `n` | new task (form) |
+| `e` / `E` | edit in the form / open the file in your editor |
+| `x` | mark as done / reopen |
+| `1` `2` `3` | priority high / normal / low |
+| `D`, `r`, `b`, `d` | due date, rename, bucket, delete |
+| `⏎` | details with notes |
+| `f` | bucket filter; create, rename and delete buckets |
+| `v` / `c` | show or hide the done column / the calendar |
+| `s` | sync with the git remote |
+| `t` | choose a theme |
+| `q` | quit |
+
+## Command line
+
+The command line is always English and meant for quick capture and scripts.
+
+```sh
+shdo Pay invoice P1 due:fri @work   # new task; P1–P3, due: and @bucket anywhere
+shdo -- ls is broken                # title that starts with a command name
+shdo ls                             # board as text (honours the bucket filter, -a for all)
+shdo done a3f                       # IDs can be shortened while unique
+shdo mv a3f doing                   # status by key or name
+shdo bucket a3f home                # set a bucket, "-" removes it
+shdo edit a3f                       # open the file in $EDITOR
+shdo sync                           # git add, commit, pull --rebase, push
+shdo archive                        # move done tasks to archive/
+```
+
+Dates for `due:` work in English and German: `2026-10-24`, `10/24`, `24.10.`, `+3d`,
+`+2w`, `+1m`, `today`, `tomorrow`, `mon` … `sun` (the next one, never today).
+
+## Files
+
+A task is a Markdown file named after its ID:
+
+```markdown
++++
+title = "Quarterly report"
+status = "todo"
+prio = 1
+due = 2026-10-26
+bucket = "work"
+created = 2026-10-22T10:41:00+02:00
+moved = 2026-10-22T10:41:00+02:00
++++
+
+Numbers are in the shared drive.
+
+- [x] collect numbers
+- [ ] write summary
+- [ ] send to team
+```
+
+The data directory contains `shdo.toml` with the statuses and buckets, `tasks/` and
+`archive/`. Statuses and buckets have a stable `key` used in the files and a `name` that
+is only displayed, so renaming never touches your tasks. Comments and unknown fields in
+these files are preserved when shdo writes them.
+
+## Configuration
+
+Per-machine settings live in `~/.config/shdo/config.toml` and are written by the setup,
+the theme picker and the filter:
+
+```toml
+language = "en"          # "en" or "de"
+dir = "~/.local/share/shdo"
+editor = "hx"            # defaults to $VISUAL, then $EDITOR
+theme = "nord"
+buckets = ["work"]       # shown buckets; empty = all
+holidays = "de-bw"       # empty = none
+show_done = true
+show_calendar = true
+```
+
+### Themes
+
+Custom themes go into `~/.config/shdo/themes/<name>.toml` and appear in the theme picker.
+Missing colors fall back to the default theme:
+
+```toml
+name = "My theme"
+
+[colors]
+bg = "#1a1b26"
+fg = "#c0caf5"
+border_active = "#9ece6a"
+```
+
+Available tokens: `bg`, `fg`, `dim`, `border`, `border_active`, `title`, `accent`,
+`selection`, `prio_high`, `prio_low`, `overdue`, `today`, `done`, `key`, `warn`,
+`weekend`, `holiday`. Colors are `#rrggbb` or ANSI names such as `red` or `reset`.
+
+### Shell completion
+
+```sh
+shdo completions fish > ~/.config/fish/completions/shdo.fish
+```
+
+Run `shdo completions` without arguments for bash and zsh. Fish also completes task IDs
+(with titles), statuses, buckets and `due:` values.
+
+## License
+
+MIT
