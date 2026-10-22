@@ -317,8 +317,8 @@ impl App {
                         scroll: scroll.saturating_sub(1),
                     }
                 }
-                KeyCode::Char('e') => self.request_editor(),
-                KeyCode::Char('E') => self.open_edit_form(),
+                KeyCode::Char('e') => self.open_edit_form(),
+                KeyCode::Char('E') => self.request_editor(),
                 _ => {}
             },
             Mode::Filter {
@@ -350,7 +350,7 @@ impl App {
             KeyCode::Char('n') => {
                 self.mode = Mode::Form(Box::new(Form::new_task(&self.board, self.col)))
             }
-            KeyCode::Char('E') => self.open_edit_form(),
+            KeyCode::Char('e') => self.open_edit_form(),
             KeyCode::Char('r') => {
                 if let Some(t) = self.selected() {
                     let input = Input::with(&t.title);
@@ -376,7 +376,7 @@ impl App {
                     self.mode = Mode::ConfirmDelete;
                 }
             }
-            KeyCode::Char('e') => self.request_editor(),
+            KeyCode::Char('E') => self.request_editor(),
             KeyCode::Enter => {
                 if self.selected().is_some() {
                     self.mode = Mode::Detail { scroll: 0 };

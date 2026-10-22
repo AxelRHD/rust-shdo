@@ -288,15 +288,15 @@ Global: --dir <pfad>
 | `L` / `Shift+→` | Karte eine Spalte nach rechts (Selektion folgt)         |
 | `x`             | Erledigt bzw. wieder offen (Selektion bleibt in Spalte) |
 | `n`             | Neue Karte: Formular, Status der Spalte vorbelegt       |
-| `E`             | Karte im Formular bearbeiten                            |
+| `e`             | Karte im Formular bearbeiten                            |
+| `E`             | Task-Datei im Editor öffnen, danach neu laden           |
 | `b`             | Bucket setzen (Auswahlliste)                            |
 | `f`             | Bucket-Filter (Checkboxen)                              |
 | `v`             | Letzte Spalte (Erledigt) ein-/ausblenden, lokal gespeichert; Kopfzeile zeigt „N Erledigt ausgeblendet“ |
 | `r`             | Titel umbenennen                                        |
 | `1`–`3`         | Prio setzen                                             |
 | `D`             | Due setzen (leere Eingabe entfernt)                     |
-| `⏎`             | Detailansicht (Felder + Notiz), dort `e` für Editor     |
-| `e`             | Task-Datei im Editor öffnen, danach neu laden           |
+| `⏎`             | Detailansicht (Felder + Notiz), dort `e` Formular, `E` Editor |
 | `d`             | Löschen (mit Bestätigung `j`)                           |
 | `s`             | Sync im Hintergrund                                     |
 | `R`             | Neu laden                                               |
@@ -328,7 +328,7 @@ Global: --dir <pfad>
   das Formular zeigt sie live („erkannt: P1 · morgen“) und an den betroffenen Feldern
   („← Titel: P1“)
 - Fälligkeit mit Live-Vorschau des erkannten Datums bzw. Fehlerhinweis
-- Bearbeiten: mehrzeilige Notizen sind schreibgeschützt („im Editor bearbeiten (e)“)
+- Bearbeiten: mehrzeilige Notizen sind schreibgeschützt („im Editor bearbeiten (E)“)
 - Ungültige Eingaben: Formular bleibt offen, Fehler in der Statuszeile
 
 ### Filter-Popup (`f`)

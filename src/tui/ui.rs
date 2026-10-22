@@ -32,7 +32,8 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
         "Karten",
         &[
             ("n", "neue Karte (Formular, Status der Spalte vorbelegt)"),
-            ("E", "Karte im Formular bearbeiten"),
+            ("e", "Karte im Formular bearbeiten"),
+            ("E", "Task-Datei im Editor öffnen"),
             ("H / ⇧←", "Karte nach links (vorheriger Status)"),
             ("L / ⇧→", "Karte nach rechts (nächster Status)"),
             ("x", "erledigt / wieder offen"),
@@ -40,7 +41,6 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
             ("1 2 3", "Prio hoch / normal / niedrig"),
             ("D", "Fälligkeit setzen (leer = entfernen)"),
             ("b", "Bucket setzen"),
-            ("e", "im Editor öffnen"),
             ("d", "löschen"),
         ],
     ),
@@ -463,7 +463,8 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
                 ("j/k", "Karte"),
                 ("H/L", "verschieben"),
                 ("n", "neu"),
-                ("E", "bearbeiten"),
+                ("e", "bearbeiten"),
+                ("E", "Editor"),
                 ("x", "erledigt"),
                 ("⏎", "Details"),
             ];
@@ -471,13 +472,7 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
                 k.extend([("f", "Filter"), ("b", "Bucket")]);
             }
             k.push(("v", "Erledigt ein/aus"));
-            k.extend([
-                ("e", "Editor"),
-                ("s", "Sync"),
-                ("t", "Theme"),
-                ("?", "Hilfe"),
-                ("q", "Ende"),
-            ]);
+            k.extend([("s", "Sync"), ("t", "Theme"), ("?", "Hilfe"), ("q", "Ende")]);
             k
         }
         Mode::Input { .. } => vec![("⏎", "speichern"), ("Esc", "abbrechen"), ("^U", "leeren")],
@@ -498,8 +493,8 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
         ],
         Mode::Detail { .. } => vec![
             ("j/k", "scrollen"),
-            ("E", "bearbeiten"),
-            ("e", "Editor"),
+            ("e", "bearbeiten"),
+            ("E", "Editor"),
             ("Esc", "schließen"),
         ],
         Mode::Filter { .. } => vec![
@@ -821,7 +816,7 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
             }
             Field::Note if form.note_editable => text_field(&form.note, &mut spans, value_width),
             Field::Note => spans.push(Span::styled(
-                "mehrzeilig – im Editor bearbeiten (e)",
+                "mehrzeilig – im Editor bearbeiten (E)",
                 Style::new().fg(c.dim),
             )),
             Field::Status => spans.extend(choice(
