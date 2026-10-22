@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use anyhow::Result;
 use jiff::Zoned;
 
-use crate::store::{BoardConfig, BucketDef, ColumnDef, Store, resolve_def};
+use crate::store::{BoardConfig, BucketDef, StatusDef, Store, resolve_def};
 use crate::task::Task;
 
 /// Filter-Eintrag für Tasks ohne (gültigen) Bucket.
@@ -51,7 +51,7 @@ impl Filter {
 }
 
 pub struct Column {
-    pub def: ColumnDef,
+    pub def: StatusDef,
     pub tasks: Vec<Task>,
 }
 
@@ -73,7 +73,7 @@ impl Board {
         Ok(Board::build(cfg, tasks, warnings, filter.clone()))
     }
 
-    /// Tasks mit unbekannter oder fehlender Spalte landen in der ersten Spalte, Tasks mit
+    /// Tasks mit unbekanntem oder fehlendem Status landen in der ersten Spalte, Tasks mit
     /// unbekanntem Bucket gelten als „ohne Bucket“ (jeweils mit Warnung).
     pub fn build(
         cfg: BoardConfig,
@@ -83,7 +83,7 @@ impl Board {
     ) -> Board {
         let filter = filter.normalized(&cfg.buckets);
         let mut columns: Vec<Column> = cfg
-            .columns
+            .statuses
             .into_iter()
             .map(|def| Column {
                 def,
@@ -94,13 +94,13 @@ impl Board {
         let mut bucket_counts = vec![0; cfg.buckets.len() + 1];
         let mut hidden = 0;
         for task in tasks {
-            let idx = match columns.iter().position(|c| c.def.key == task.column) {
+            let idx = match columns.iter().position(|c| c.def.key == task.status) {
                 Some(i) => i,
                 None => {
-                    if task.column.is_empty() {
-                        warnings.push(format!("{}: keine Spalte gesetzt", task.id));
+                    if task.status.is_empty() {
+                        warnings.push(format!("{}: kein Status gesetzt", task.id));
                     } else {
-                        warnings.push(format!("{}: unbekannte Spalte „{}“", task.id, task.column));
+                        warnings.push(format!("{}: unbekannter Status „{}“", task.id, task.status));
                     }
                     0
                 }
@@ -159,8 +159,8 @@ impl Board {
             .count()
     }
 
-    pub fn resolve_column(&self, input: &str) -> Option<usize> {
-        let defs: Vec<ColumnDef> = self.columns.iter().map(|c| c.def.clone()).collect();
+    pub fn resolve_status(&self, input: &str) -> Option<usize> {
+        let defs: Vec<StatusDef> = self.columns.iter().map(|c| c.def.clone()).collect();
         resolve_def(&defs, input)
     }
 
@@ -232,10 +232,10 @@ pub fn resolve_bucket(buckets: &[BucketDef], raw: &str) -> Result<String> {
     }
 }
 
-/// Verschiebt einen Task in Spalte `target` und speichert ihn.
+/// Setzt den Status `target` (Index) und speichert den Task.
 pub fn move_task(
     task: &mut Task,
-    board_defs: &[ColumnDef],
+    board_defs: &[StatusDef],
     target: usize,
     now: &Zoned,
 ) -> Result<()> {
@@ -280,7 +280,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn task(id: &str, extra: &str) -> Task {
-        let raw = format!("+++\ntitle = \"{id}\"\ncolumn = \"todo\"\n{extra}\n+++\n");
+        let raw = format!("+++\ntitle = \"{id}\"\nstatus = \"todo\"\n{extra}\n+++\n");
         Task::parse(id, PathBuf::from(format!("{id}.md")), &raw).unwrap()
     }
 
@@ -321,9 +321,9 @@ mod tests {
     fn unknown_columns_go_first_with_warning() {
         let defs = parse_board("").unwrap();
         let mut odd = task("odd", "");
-        odd.column = "weg".into();
+        odd.status = "weg".into();
         let mut doing = task("d", "");
-        doing.column = "doing".into();
+        doing.status = "doing".into();
         let board = Board::build(defs, vec![odd, doing], vec![], Filter::all());
         assert_eq!(ids(&board.columns[0].tasks), ["odd"]);
         assert_eq!(ids(&board.columns[1].tasks), ["d"]);
@@ -335,7 +335,7 @@ mod tests {
     fn counts_and_resolve() {
         let defs = parse_board("").unwrap();
         let mut done = task("x", "due = 2020-01-01");
-        done.column = "done".into();
+        done.status = "done".into();
         let board = Board::build(
             defs,
             vec![task("a", "due = 2020-01-01"), task("b", ""), done],
@@ -344,12 +344,12 @@ mod tests {
         );
         assert_eq!(board.open_count(), 2);
         assert_eq!(board.overdue_count(date(2026, 10, 22)), 1);
-        assert_eq!(board.resolve_column("Doing"), Some(1));
-        assert_eq!(board.resolve_column("in arbeit"), Some(1));
-        assert_eq!(board.resolve_column("wa"), Some(2));
-        assert_eq!(board.resolve_column("erl"), Some(3));
-        assert_eq!(board.resolve_column("arbeit"), Some(1));
-        assert_eq!(board.resolve_column("xyz"), None);
+        assert_eq!(board.resolve_status("Doing"), Some(1));
+        assert_eq!(board.resolve_status("in arbeit"), Some(1));
+        assert_eq!(board.resolve_status("wa"), Some(2));
+        assert_eq!(board.resolve_status("erl"), Some(3));
+        assert_eq!(board.resolve_status("arbeit"), Some(1));
+        assert_eq!(board.resolve_status("xyz"), None);
         assert_eq!(board.find("b"), Some((0, 1)));
     }
 

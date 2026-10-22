@@ -55,10 +55,10 @@ enum Cmd {
     },
     /// Bucket eines Tasks setzen („-“ entfernt ihn)
     Bucket { id: String, bucket: String },
-    /// Task als erledigt markieren (in die letzte Spalte)
+    /// Task als erledigt markieren (letzter Status)
     Done { id: String },
-    /// Task in eine Spalte verschieben (key oder Name, Präfix reicht)
-    Mv { id: String, column: String },
+    /// Status eines Tasks setzen (key oder Name, Präfix reicht)
+    Mv { id: String, status: String },
     /// Task löschen
     Rm { id: String },
     /// Task-Datei im Editor öffnen
@@ -135,12 +135,12 @@ fn run() -> Result<()> {
             let board = Board::load(&store, &all)?;
             move_cmd(&store, &board, &id, board.last_index())
         }
-        Cmd::Mv { id, column } => {
+        Cmd::Mv { id, status } => {
             let board = Board::load(&store, &all)?;
-            let target = board.resolve_column(&column).with_context(|| {
+            let target = board.resolve_status(&status).with_context(|| {
                 let names: Vec<_> = board.columns.iter().map(|c| c.def.key.as_str()).collect();
                 format!(
-                    "unbekannte Spalte „{column}“ (vorhanden: {})",
+                    "unbekannter Status „{status}“ (vorhanden: {})",
                     names.join(", ")
                 )
             })?;
@@ -242,7 +242,7 @@ fn add(store: &Store, filter: &Filter, text: &[String]) -> Result<()> {
     let cfg = store.board_config()?;
     let filter = filter.clone().normalized(&cfg.buckets);
     let (bucket, inherited) = board::bucket_for_new(q.bucket.as_deref(), &filter, &cfg.buckets)?;
-    let mut task = store.create(&q.title, &cfg.columns[0].key, &jiff::Zoned::now());
+    let mut task = store.create(&q.title, &cfg.statuses[0].key, &jiff::Zoned::now());
     task.set_prio(q.prio);
     task.set_due(q.due);
     task.set_bucket(bucket.as_deref());

@@ -13,6 +13,7 @@ use toml_edit::{DocumentMut, Item, value};
 
 pub const DELIM: &str = "+++";
 pub const PRIO_DEFAULT: u8 = 2;
+const LEGACY_STATUS: &str = "column";
 
 #[derive(Debug, Clone)]
 pub struct Task {
@@ -21,8 +22,8 @@ pub struct Task {
     doc: DocumentMut,
     pub body: String,
     pub title: String,
-    /// Spalten-Key; leer, falls im Frontmatter nicht gesetzt.
-    pub column: String,
+    /// Status-Key; leer, falls im Frontmatter nicht gesetzt.
+    pub status: String,
     pub bucket: Option<String>,
     pub prio: Option<u8>,
     pub due: Option<Date>,
@@ -34,10 +35,10 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new(id: &str, path: PathBuf, title: &str, column: &str, now: &Zoned) -> Task {
+    pub fn new(id: &str, path: PathBuf, title: &str, status: &str, now: &Zoned) -> Task {
         let mut doc = DocumentMut::new();
         doc["title"] = value(title);
-        doc["column"] = value(column);
+        doc["status"] = value(status);
         doc["created"] = datetime_item(now);
         doc["moved"] = datetime_item(now);
         let ts = now.timestamp();
@@ -47,7 +48,7 @@ impl Task {
             doc,
             body: String::new(),
             title: title.into(),
-            column: column.into(),
+            status: status.into(),
             prio: None,
             bucket: None,
             due: None,
@@ -84,8 +85,10 @@ impl Task {
             .filter(|t| !t.is_empty())
             .ok_or_else(|| anyhow!("Feld „title“ fehlt"))?
             .to_string();
-        let column = doc
-            .get("column")
+        // `column` ist der frühere Name des Felds und wird weiter gelesen.
+        let status = doc
+            .get("status")
+            .or_else(|| doc.get(LEGACY_STATUS))
             .and_then(Item::as_str)
             .unwrap_or("")
             .to_string();
@@ -97,7 +100,7 @@ impl Task {
             id: id.into(),
             path,
             title,
-            column,
+            status,
             bucket: doc
                 .get("bucket")
                 .and_then(Item::as_str)
@@ -191,16 +194,17 @@ impl Task {
         self.due = due;
     }
 
-    /// Verschiebt den Task in eine Spalte und pflegt `moved` und `done`.
-    pub fn move_to(&mut self, column: &str, is_done_column: bool, now: &Zoned) {
-        if self.column == column {
+    /// Setzt einen neuen Status und pflegt `moved` und `done`.
+    pub fn move_to(&mut self, status: &str, is_done: bool, now: &Zoned) {
+        if self.status == status {
             return;
         }
-        self.doc["column"] = value(column);
-        self.column = column.into();
+        self.doc.remove(LEGACY_STATUS);
+        self.doc["status"] = value(status);
+        self.status = status.into();
         self.doc["moved"] = datetime_item(now);
         self.moved = Some(now.timestamp());
-        if is_done_column {
+        if is_done {
             self.doc["done"] = datetime_item(now);
             self.done = Some(now.timestamp());
         } else {
@@ -300,7 +304,7 @@ mod tests {
     const SAMPLE: &str = "+++
 # Kommentar bleibt
 title = \"Rechnung bezahlen\"
-column = \"todo\"
+status = \"todo\"
 prio = 1
 due = 2026-10-24
 created = 2026-10-22T10:41:00+02:00
@@ -326,7 +330,7 @@ Kundennr. 4711
     fn parses_fields() {
         let t = sample();
         assert_eq!(t.title, "Rechnung bezahlen");
-        assert_eq!(t.column, "todo");
+        assert_eq!(t.status, "todo");
         assert_eq!(t.prio, Some(1));
         assert_eq!(t.due, Some(jiff::civil::date(2026, 10, 24)));
         assert_eq!(t.created.unwrap().to_string(), "2026-10-22T08:41:00Z");
@@ -387,6 +391,17 @@ Kundennr. 4711
     }
 
     #[test]
+    fn legacy_column_field_is_read_and_migrated() {
+        let raw = "+++\ntitle = \"alt\"\ncolumn = \"doing\"\n+++\n";
+        let mut t = Task::parse("x", PathBuf::new(), raw).unwrap();
+        assert_eq!(t.status, "doing");
+        t.move_to("todo", false, &now());
+        let out = t.render();
+        assert!(out.contains("status = \"todo\""));
+        assert!(!out.contains("column"));
+    }
+
+    #[test]
     fn new_task_renders_and_parses() {
         let t = Task::new(
             "b71c",
@@ -408,7 +423,7 @@ Kundennr. 4711
         assert_eq!(t.prio, Some(3));
         assert_eq!(t.due, Some(jiff::civil::date(2026, 10, 24)));
         assert!(t.created.is_some());
-        assert_eq!(t.column, "");
+        assert_eq!(t.status, "");
     }
 
     #[test]
@@ -417,7 +432,7 @@ Kundennr. 4711
             "title = \"x\"",
             "+++\ntitle = \"x\"\n",
             "+++\ntitle = \n+++\n",
-            "+++\ncolumn = \"todo\"\n+++\n",
+            "+++\nstatus = \"todo\"\n+++\n",
             "+++\ntitle = \"x\"\ndue = \"bald\"\n+++\n",
         ] {
             assert!(Task::parse("x", PathBuf::new(), raw).is_err(), "{raw:?}");

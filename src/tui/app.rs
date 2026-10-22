@@ -11,7 +11,7 @@ use super::form::{Form, Input};
 use crate::board::{self, Board, Filter, NO_BUCKET};
 use crate::config::{self, AppConfig};
 use crate::git::Git;
-use crate::store::{ColumnDef, Store};
+use crate::store::{StatusDef, Store};
 use crate::task::{PRIO_DEFAULT, Task};
 use crate::theme::{self, Theme};
 use crate::{dates, quickadd};
@@ -181,7 +181,7 @@ impl App {
         self.selected().map(|t| t.id.clone())
     }
 
-    fn defs(&self) -> Vec<ColumnDef> {
+    fn defs(&self) -> Vec<StatusDef> {
         self.board.columns.iter().map(|c| c.def.clone()).collect()
     }
 
@@ -534,7 +534,7 @@ impl App {
         if form.note_editable {
             task.set_note(&form.note.text);
         }
-        task.move_to(&defs[form.column].key, form.column == defs.len() - 1, &now);
+        task.move_to(&defs[form.status].key, form.status == defs.len() - 1, &now);
         task.save()?;
 
         let id = task.id.clone();

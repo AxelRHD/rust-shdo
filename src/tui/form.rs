@@ -59,7 +59,7 @@ impl Input {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Field {
     Title,
-    Column,
+    Status,
     Prio,
     Due,
     Bucket,
@@ -70,7 +70,7 @@ impl Field {
     pub fn label(self) -> &'static str {
         match self {
             Field::Title => "Titel",
-            Field::Column => "Spalte",
+            Field::Status => "Status",
             Field::Prio => "Prio",
             Field::Due => "Fällig",
             Field::Bucket => "Bucket",
@@ -91,8 +91,8 @@ pub struct Form {
     pub fields: Vec<Field>,
     pub focus: usize,
     pub title: Input,
-    pub column: usize,
-    pub column_names: Vec<String>,
+    pub status: usize,
+    pub status_names: Vec<String>,
     pub prio: u8,
     pub due: Input,
     /// 0 = ohne Bucket, sonst Index + 1 in `bucket_names`.
@@ -108,7 +108,7 @@ pub struct Form {
 
 impl Form {
     fn base(board: &Board) -> Form {
-        let mut fields = vec![Field::Title, Field::Column, Field::Prio, Field::Due];
+        let mut fields = vec![Field::Title, Field::Status, Field::Prio, Field::Due];
         if !board.buckets.is_empty() {
             fields.push(Field::Bucket);
         }
@@ -118,8 +118,8 @@ impl Form {
             fields,
             focus: 0,
             title: Input::default(),
-            column: 0,
-            column_names: board.columns.iter().map(|c| c.def.name.clone()).collect(),
+            status: 0,
+            status_names: board.columns.iter().map(|c| c.def.name.clone()).collect(),
             prio: PRIO_DEFAULT,
             due: Input::default(),
             bucket: 0,
@@ -131,9 +131,9 @@ impl Form {
         }
     }
 
-    pub fn new_task(board: &Board, column: usize) -> Form {
+    pub fn new_task(board: &Board, status: usize) -> Form {
         let mut f = Form::base(board);
-        f.column = column;
+        f.status = status;
         if let Some(b) = board.filter.inherited() {
             f.bucket = f
                 .bucket_keys
@@ -149,10 +149,10 @@ impl Form {
         let mut f = Form::base(board);
         f.editing = Some(task.id.clone());
         f.title = Input::with(&task.title);
-        f.column = board
+        f.status = board
             .columns
             .iter()
-            .position(|c| c.def.key == task.column)
+            .position(|c| c.def.key == task.status)
             .unwrap_or(0);
         f.prio = task.prio_or_default();
         f.due = Input::with(&task.due.map(|d| d.to_string()).unwrap_or_default());
@@ -197,7 +197,7 @@ impl Form {
     fn cycle(&mut self, delta: isize) {
         let wrap = |v: usize, n: usize| ((v as isize + delta).rem_euclid(n as isize)) as usize;
         match self.focused() {
-            Field::Column => self.column = wrap(self.column, self.column_names.len()),
+            Field::Status => self.status = wrap(self.status, self.status_names.len()),
             Field::Prio => self.prio = wrap(self.prio as usize - 1, 3) as u8 + 1,
             Field::Bucket => {
                 self.bucket = wrap(self.bucket, self.bucket_names.len() + 1);
@@ -255,7 +255,7 @@ mod tests {
         let f = Form::new_task(&board(&["work"]), 1);
         assert_eq!(f.bucket_key(), Some("work"));
         assert!(f.inherited);
-        assert_eq!(f.column, 1);
+        assert_eq!(f.status, 1);
         let f = Form::new_task(&board(&["work", "home"]), 0);
         assert_eq!(f.bucket_key(), None);
         assert!(!f.inherited);

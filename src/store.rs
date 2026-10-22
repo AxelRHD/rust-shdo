@@ -11,23 +11,23 @@ use crate::task::Task;
 pub const BOARD_FILE: &str = "shdo.toml";
 const ID_CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
 
-pub const DEFAULT_BOARD: &str = r#"# Spalten des Boards. Die erste ist die Eingangsspalte für neue Tasks,
-# die letzte gilt als „erledigt“. Der key steht in den Task-Dateien,
+pub const DEFAULT_BOARD: &str = r#"# Status der Tasks, je einer als Spalte im Board. Der erste gilt für neue Tasks,
+# der letzte als „erledigt“. Der key steht in den Task-Dateien,
 # der name ist nur die Anzeige und darf jederzeit geändert werden.
 
-[[columns]]
+[[status]]
 key = "todo"
 name = "Offen"
 
-[[columns]]
+[[status]]
 key = "doing"
 name = "In Arbeit"
 
-[[columns]]
+[[status]]
 key = "wait"
 name = "Wartet"
 
-[[columns]]
+[[status]]
 key = "done"
 name = "Erledigt"
 
@@ -44,23 +44,25 @@ name = "Erledigt"
 "#;
 
 #[derive(Debug, Clone, serde::Deserialize)]
-pub struct ColumnDef {
+pub struct StatusDef {
     pub key: String,
     pub name: String,
 }
 
-/// Buckets haben dieselbe Form wie Spalten.
-pub type BucketDef = ColumnDef;
+/// Buckets haben dieselbe Form wie Status.
+pub type BucketDef = StatusDef;
 
 #[derive(Debug, Clone)]
 pub struct BoardConfig {
-    pub columns: Vec<ColumnDef>,
+    pub statuses: Vec<StatusDef>,
     pub buckets: Vec<BucketDef>,
 }
 
 #[derive(Debug, serde::Deserialize)]
 struct BoardFile {
-    columns: Option<Vec<ColumnDef>>,
+    /// `columns` ist der frühere Name und wird weiter gelesen.
+    #[serde(alias = "columns")]
+    status: Option<Vec<StatusDef>>,
     #[serde(default)]
     buckets: Vec<BucketDef>,
 }
@@ -114,7 +116,7 @@ impl Store {
         Ok(created)
     }
 
-    /// Spalten und Buckets aus `shdo.toml`; Default-Spalten bei fehlender Datei oder fehlendem Feld.
+    /// Status und Buckets aus `shdo.toml`; Default-Status bei fehlender Datei oder fehlendem Feld.
     pub fn board_config(&self) -> Result<BoardConfig> {
         let path = self.dir.join(BOARD_FILE);
         let raw = match fs::read_to_string(&path) {
@@ -228,16 +230,16 @@ impl Store {
 
 pub fn parse_board(raw: &str) -> Result<BoardConfig> {
     let file: BoardFile = toml::from_str(raw)?;
-    let columns = match file.columns {
+    let statuses = match file.status {
         Some(c) => c,
         None => toml::from_str::<BoardFile>(DEFAULT_BOARD)?
-            .columns
-            .expect("Default hat Spalten"),
+            .status
+            .expect("Default hat Status"),
     };
-    if columns.is_empty() {
-        bail!("mindestens eine Spalte nötig");
+    if statuses.is_empty() {
+        bail!("mindestens ein Status nötig");
     }
-    validate_keys(&columns, "Spalte")?;
+    validate_keys(&statuses, "Status")?;
     validate_keys(&file.buckets, "Bucket")?;
     if let Some(b) = file
         .buckets
@@ -247,12 +249,12 @@ pub fn parse_board(raw: &str) -> Result<BoardConfig> {
         bail!("Bucket-key „{}“ ist reserviert", b.key);
     }
     Ok(BoardConfig {
-        columns,
+        statuses,
         buckets: file.buckets,
     })
 }
 
-fn validate_keys(defs: &[ColumnDef], what: &str) -> Result<()> {
+fn validate_keys(defs: &[StatusDef], what: &str) -> Result<()> {
     for (i, c) in defs.iter().enumerate() {
         if c.key.trim().is_empty() {
             bail!("{what} {} hat keinen key", i + 1);
@@ -266,7 +268,7 @@ fn validate_keys(defs: &[ColumnDef], what: &str) -> Result<()> {
 
 /// Findet einen Eintrag über key oder Name (Groß-/Kleinschreibung egal);
 /// sonst über einen eindeutigen Präfix von key oder einem Wort des Namens.
-pub fn resolve_def(defs: &[ColumnDef], input: &str) -> Option<usize> {
+pub fn resolve_def(defs: &[StatusDef], input: &str) -> Option<usize> {
     let q = input.trim().to_lowercase();
     if q.is_empty() {
         return None;
@@ -315,27 +317,30 @@ mod tests {
     }
 
     #[test]
-    fn init_is_idempotent_and_has_default_columns() {
+    fn init_is_idempotent_and_has_default_statuses() {
         let (_tmp, s) = store();
         assert!(s.init().unwrap().is_empty());
         let cfg = s.board_config().unwrap();
         assert!(cfg.buckets.is_empty());
-        let keys: Vec<_> = cfg.columns.iter().map(|c| c.key.as_str()).collect();
+        let keys: Vec<_> = cfg.statuses.iter().map(|c| c.key.as_str()).collect();
         assert_eq!(keys, ["todo", "doing", "wait", "done"]);
     }
 
     #[test]
     fn board_validation() {
-        assert_eq!(parse_board("").unwrap().columns.len(), 4);
-        assert!(parse_board("columns = []").is_err());
+        assert_eq!(parse_board("").unwrap().statuses.len(), 4);
+        assert!(parse_board("status = []").is_err());
         assert!(
-            parse_board("[[columns]]\nkey='a'\nname='A'\n[[columns]]\nkey='a'\nname='B'").is_err()
+            parse_board("[[status]]\nkey='a'\nname='A'\n[[status]]\nkey='a'\nname='B'").is_err()
         );
         let cfg = parse_board(
             "[[buckets]]\nkey='home'\nname='Privat'\n[[buckets]]\nkey='work'\nname='Arbeit'",
         )
         .unwrap();
-        assert_eq!(cfg.columns.len(), 4);
+        assert_eq!(cfg.statuses.len(), 4);
+        // früherer Name
+        let legacy = parse_board("[[columns]]\nkey='a'\nname='A'").unwrap();
+        assert_eq!(legacy.statuses[0].key, "a");
         assert_eq!(cfg.buckets.len(), 2);
         assert!(parse_board("[[buckets]]\nkey='-'\nname='x'").is_err());
         assert_eq!(resolve_def(&cfg.buckets, "arb"), Some(1));

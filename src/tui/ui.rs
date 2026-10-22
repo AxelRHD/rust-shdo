@@ -31,10 +31,10 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
     (
         "Karten",
         &[
-            ("n", "neue Karte (Formular, Spalte vorbelegt)"),
+            ("n", "neue Karte (Formular, Status der Spalte vorbelegt)"),
             ("E", "Karte im Formular bearbeiten"),
-            ("H / ⇧←", "Karte nach links verschieben"),
-            ("L / ⇧→", "Karte nach rechts verschieben"),
+            ("H / ⇧←", "Karte nach links (vorheriger Status)"),
+            ("L / ⇧→", "Karte nach rechts (nächster Status)"),
             ("x", "erledigt / wieder offen"),
             ("r", "Titel umbenennen"),
             ("1 2 3", "Prio hoch / normal / niedrig"),
@@ -48,7 +48,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
         "Formular",
         &[
             ("Tab ↓ / ⇧Tab ↑", "nächstes / voriges Feld"),
-            ("← → Space", "Auswahl ändern (Spalte, Prio, Bucket)"),
+            ("← → Space", "Auswahl ändern (Status, Prio, Bucket)"),
             ("⏎", "speichern (aus jedem Feld)"),
             ("Esc", "verwerfen"),
             ("Titel", "P1–P3, due:fr, @work direkt im Titel gehen auch"),
@@ -639,8 +639,8 @@ fn draw_detail(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
         .board
         .columns
         .iter()
-        .find(|col| col.def.key == t.column)
-        .map_or(t.column.as_str(), |col| col.def.name.as_str());
+        .find(|col| col.def.key == t.status)
+        .map_or(t.status.as_str(), |col| col.def.name.as_str());
     let field = |k: &str, v: String| {
         Line::from(vec![
             Span::styled(format!("{k:<12}"), Style::new().fg(c.dim)),
@@ -654,7 +654,7 @@ fn draw_detail(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
         )),
         Line::default(),
         field("ID", t.id.clone()),
-        field("Spalte", column.to_string()),
+        field("Status", column.to_string()),
         field("Prio", format!("P{}", t.prio_or_default())),
     ];
     if let Some(b) = &t.bucket {
@@ -824,8 +824,8 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
                 "mehrzeilig – im Editor bearbeiten (e)",
                 Style::new().fg(c.dim),
             )),
-            Field::Column => spans.extend(choice(
-                form.column_names[form.column].clone(),
+            Field::Status => spans.extend(choice(
+                form.status_names[form.status].clone(),
                 Style::new().fg(c.fg),
                 focused,
             )),

@@ -62,28 +62,31 @@ show_done = true     # Spalte „Erledigt“ anzeigen, wird von der TUI geschrie
 ### Board-Konfiguration (`shdo.toml` im Daten-Repo, wird synchronisiert)
 
 ```toml
-[[columns]]
+[[status]]
 key = "todo"
 name = "Offen"
 
-[[columns]]
+[[status]]
 key = "doing"
 name = "In Arbeit"
 
-[[columns]]
+[[status]]
 key = "wait"
 name = "Wartet"
 
-[[columns]]
+[[status]]
 key = "done"
 name = "Erledigt"
 ```
 
 - `key` steht in den Task-Dateien, `name` ist nur Anzeige und frei änderbar
 - Default (s. o.), falls Datei oder Feld fehlt; keys müssen eindeutig sein
-- Erste Spalte = Eingang für neue Tasks, letzte Spalte = erledigt
+- Jeder Status ist eine Spalte im Board. Erster Status = Eingang für neue Tasks, letzter = erledigt
+- Begriff: in Daten und Formularen „Status“, „Spalte“ nur fürs Layout (Navigation `h`/`l`)
+- Früherer Name `[[columns]]` bzw. `column = …` wird weiter gelesen; beim nächsten
+  Statuswechsel schreibt shdo `status`
 
-Optional Buckets (z. B. Privat/Arbeit), gleiche Form wie Spalten:
+Optional Buckets (z. B. Privat/Arbeit), gleiche Form wie Status:
 
 ```toml
 [[buckets]]
@@ -118,7 +121,7 @@ name = "Arbeit"
 ```markdown
 +++
 title = "Rechnung bezahlen"
-column = "todo"
+status = "todo"
 prio = 1
 due = 2026-10-24
 created = 2026-10-22T10:41:00+02:00
@@ -134,10 +137,10 @@ Kundennr. 4711, bis Freitag
 | Feld      | Pflicht | Typ                     | Beschreibung                                        |
 |-----------|---------|-------------------------|-----------------------------------------------------|
 | `title`   | ja      | String                  | Kurzer Titel                                        |
-| `column`  | ja      | String                  | `key` einer Spalte aus `shdo.toml`                  |
+| `status`  | ja      | String                  | `key` eines Status aus `shdo.toml`                  |
 | `created` | ja      | Datum + Zeit (RFC 3339) | Beim Anlegen gesetzt, ändert sich nie               |
-| `moved`   | nein    | Datum + Zeit            | Zeitpunkt, seit dem der Task in seiner Spalte ist   |
-| `done`    | nein    | Datum + Zeit            | Gesetzt beim Wechsel in die letzte Spalte, entfernt beim Verlassen |
+| `moved`   | nein    | Datum + Zeit            | Zeitpunkt, seit dem der Task diesen Status hat     |
+| `done`    | nein    | Datum + Zeit            | Gesetzt beim Wechsel in den letzten Status, entfernt beim Verlassen |
 | `prio`    | nein    | Integer 1–3             | 1 = hoch, 2 = normal (Default), 3 = niedrig         |
 | `bucket`  | nein    | String                  | `key` eines Buckets aus `shdo.toml`                 |
 | `due`     | nein    | Datum (lokal)           | Fälligkeit ohne Uhrzeit                             |
@@ -149,7 +152,7 @@ Kundennr. 4711, bis Freitag
 - Jede Änderung schreibt ausschließlich die Datei dieses Tasks (atomar über Temp-Datei + Rename)
 - Unbekannte Felder und Kommentare im Frontmatter bleiben erhalten, der Body bleibt unverändert
 - Tolerant beim Lesen: `prio` außerhalb 1–3 wird geklemmt, Daten dürfen auch als String stehen
-- Tasks mit unbekannter oder fehlender `column` erscheinen in der ersten Spalte, mit Warnung
+- Tasks mit unbekanntem oder fehlendem `status` erscheinen in der ersten Spalte, mit Warnung
   (Datei wird nicht automatisch geändert)
 - Tasks mit unbekanntem `bucket` gelten als „ohne Bucket“, mit Warnung
 - Ungültige Dateien werden übersprungen und als Warnung gemeldet
@@ -186,7 +189,7 @@ shdo -- <text>                    dito, wenn der Titel mit einem Befehl beginnt
 shdo ls [-a] [@bucket]            Board als Text (Filter; -a alle; @bucket einmalig)
 shdo bucket <id> <bucket|->       Bucket setzen bzw. entfernen
 shdo done <id>                    In die letzte Spalte
-shdo mv <id> <spalte>             Verschieben (key oder Name, Wort-Präfix reicht: „arbeit“)
+shdo mv <id> <status>             Status setzen (key oder Name, Wort-Präfix reicht: „arbeit“)
 shdo rm <id>                      Löschen
 shdo edit <id>                    Task-Datei im Editor öffnen
 shdo sync                         Mit dem Git-Remote synchronisieren
@@ -269,7 +272,7 @@ Global: --dir <pfad>
 | `H` / `Shift+←` | Karte eine Spalte nach links (Selektion folgt)          |
 | `L` / `Shift+→` | Karte eine Spalte nach rechts (Selektion folgt)         |
 | `x`             | Erledigt bzw. wieder offen (Selektion bleibt in Spalte) |
-| `n`             | Neue Karte: Formular, Spalte vorbelegt                  |
+| `n`             | Neue Karte: Formular, Status der Spalte vorbelegt       |
 | `E`             | Karte im Formular bearbeiten                            |
 | `b`             | Bucket setzen (Auswahlliste)                            |
 | `f`             | Bucket-Filter (Checkboxen)                              |
@@ -295,7 +298,7 @@ Global: --dir <pfad>
 ┌ Neuer Task ─────────────────────────────────────────────────┐
 │ ▸ Titel     Folien bauen                                    │
 │             P1–P3 · due:fr · @bucket im Titel gehen auch    │
-│   Spalte    ‹ Offen ›                                       │
+│   Status    ‹ Offen ›                                       │
 │   Prio      ‹ P1 hoch ›                                     │
 │   Fällig    fr                        → 23.10.2026 (morgen) │
 │   Bucket    ‹ Arbeit ›  aus Filter übernommen               │
@@ -303,7 +306,7 @@ Global: --dir <pfad>
 └─────────────────────────────────────────────────────────────┘
 ```
 
-- Felder: Titel, Spalte, Prio, Fällig, Bucket (nur wenn definiert), Notiz (einzeilig)
+- Felder: Titel, Status, Prio, Fällig, Bucket (nur wenn definiert), Notiz (einzeilig)
 - `Tab`/`↓` bzw. `⇧Tab`/`↑` wechseln das Feld, `←`/`→`/`Space` (bzw. `h`/`l`) ändern
   Auswahlfelder, `1`–`3` im Prio-Feld, `Enter` speichert aus jedem Feld, `Esc` verwirft
 - Schneller Weg bleibt: `n`, `Rechnung P1 due:fr`, `Enter`. Tokens im Titel haben Vorrang;
@@ -386,7 +389,7 @@ Tests arbeiten in temporären Verzeichnissen, nie in `~/tasks`; Datumstests mit 
 
 - Shell-Completion (Fish zuerst, per `clap_complete`): `shdo completions fish` gibt das
   Skript aus; dynamisch ergänzt werden IDs (mit Titel als Beschreibung) bei
-  `done`/`mv`/`rm`/`edit` und Spalten bei `mv`
+  `done`/`mv`/`rm`/`edit` und Status bei `mv`
 - Auto-Sync beim Start/Beenden der TUI (optional, per Config)
 - Weitere eingebaute Themes (Nord, Catppuccin Mocha/Latte, Gruvbox)
 - Eigene Themes in der TUI anlegen/löschen – löschbar nur selbst angelegte, nie eingebaute
