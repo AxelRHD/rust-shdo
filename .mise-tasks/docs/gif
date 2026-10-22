@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-#MISE description="docs/demo.gif mit vhs aufnehmen (braucht vhs, ttyd und ffmpeg)"
+#MISE description="docs/demo.gif mit vhs aufnehmen (installiert vhs, ttyd und ffmpeg über mise)"
+#MISE tools={vhs="0.12.1", ttyd="1.7.7", ffmpeg="9.0.2"}
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 for tool in vhs ttyd ffmpeg; do
-  command -v "$tool" >/dev/null || { echo "❌ $tool fehlt"; exit 1; }
+  command -v "$tool" >/dev/null || { echo "❌ $tool fehlt (mise install sollte es mitbringen)"; exit 1; }
 done
 cargo build -q --release
 work="$MISE_PROJECT_ROOT/target/gif"
