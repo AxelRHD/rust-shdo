@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 - 2026-10-22
 
 - `,` opens the settings (config.toml) in the editor; changes apply when the editor
   closes (the data directory on the next start)
