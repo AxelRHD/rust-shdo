@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1 - 2026-10-22
+
+- New values in config.toml (from the setup, the theme picker or the toggles) replace
+  their commented example instead of landing above the file header
+
 ## 0.3.0 - 2026-10-22
 
 - `,` opens the settings (config.toml) in the editor; changes apply when the editor
