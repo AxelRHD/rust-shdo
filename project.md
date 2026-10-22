@@ -51,6 +51,7 @@ dir = "~/tasks"      # Datenverzeichnis
 editor = "hx"        # optional
 theme = "tokyonight" # wird von der TUI geschrieben (`t`)
 buckets = ["work"]   # angezeigte Buckets, wird von der TUI geschrieben (`f`)
+show_done = true     # Spalte „Erledigt“ anzeigen, wird von der TUI geschrieben (`v`)
 ```
 
 - Datenverzeichnis: `--dir` > `dir` aus der Config > `~/tasks`
@@ -272,6 +273,7 @@ Global: --dir <pfad>
 | `E`             | Karte im Formular bearbeiten                            |
 | `b`             | Bucket setzen (Auswahlliste)                            |
 | `f`             | Bucket-Filter (Checkboxen)                              |
+| `v`             | Letzte Spalte (Erledigt) ein-/ausblenden, lokal gespeichert; Kopfzeile zeigt „N Erledigt ausgeblendet“ |
 | `r`             | Titel umbenennen                                        |
 | `1`–`3`         | Prio setzen                                             |
 | `D`             | Due setzen (leere Eingabe entfernt)                     |

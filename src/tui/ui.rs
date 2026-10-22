@@ -70,6 +70,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
         &[
             ("s", "Sync mit Git-Remote"),
             ("R", "neu laden"),
+            ("v", "Spalte „Erledigt“ ein-/ausblenden"),
             ("t", "Theme wählen"),
             ("?", "diese Hilfe"),
             ("q / Esc", "beenden bzw. abbrechen"),
@@ -125,6 +126,14 @@ fn draw_header(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
     if overdue > 0 {
         parts.push(format!("{overdue} überfällig"));
     }
+    if !app.show_done {
+        let last = &app.board.columns[app.board.last_index()];
+        parts.push(format!(
+            "{} {} ausgeblendet",
+            last.tasks.len(),
+            last.def.name
+        ));
+    }
     let filter = app.board.filter_label().map(|label| {
         let mut s = format!("⧩ {label}");
         if app.board.hidden > 0 {
@@ -171,7 +180,7 @@ fn tilde_path(p: &std::path::Path) -> String {
 }
 
 fn draw_board(f: &mut Frame, app: &mut App, c: &Palette, area: Rect) {
-    let n = app.board.columns.len();
+    let n = app.visible_columns();
     let visible = ((area.width / MIN_COLUMN_WIDTH) as usize).clamp(1, n);
     if app.col < app.col_offset {
         app.col_offset = app.col;
@@ -461,6 +470,7 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
             if has_buckets {
                 k.extend([("f", "Filter"), ("b", "Bucket")]);
             }
+            k.push(("v", "Erledigt ein/aus"));
             k.extend([
                 ("e", "Editor"),
                 ("s", "Sync"),

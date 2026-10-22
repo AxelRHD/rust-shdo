@@ -81,6 +81,8 @@ pub struct App {
     /// Erste sichtbare Spalte, falls nicht alle Spalten nebeneinander passen.
     pub col_offset: usize,
     pub mode: Mode,
+    /// Letzte Spalte (erledigt) anzeigen; lokal gespeichert.
+    pub show_done: bool,
     pub status: Option<(Level, String)>,
     pub themes: Vec<Theme>,
     pub theme: usize,
@@ -106,6 +108,7 @@ impl App {
         let filter = Filter {
             buckets: cfg.buckets.clone(),
         };
+        let show_done = cfg.show_done.unwrap_or(true);
         let board = Board::load(&store, &filter)?;
         let n = board.columns.len();
         Ok(App {
@@ -120,6 +123,7 @@ impl App {
             offsets: vec![0; n],
             col_offset: 0,
             mode: Mode::Normal,
+            show_done,
             status: None,
             themes,
             theme,
@@ -152,6 +156,25 @@ impl App {
             .get(self.col)?
             .tasks
             .get(self.rows[self.col])
+    }
+
+    /// Anzahl der angezeigten Spalten (ohne „Erledigt“, falls ausgeblendet).
+    pub fn visible_columns(&self) -> usize {
+        let n = self.board.columns.len();
+        if self.show_done || n == 1 { n } else { n - 1 }
+    }
+
+    fn toggle_show_done(&mut self) {
+        self.show_done = !self.show_done;
+        self.col = self.col.min(self.visible_columns() - 1);
+        let res = config::set_bool(&self.cfg_path, "show_done", self.show_done);
+        let name = self.board.columns[self.board.last_index()].def.name.clone();
+        let msg = if self.show_done {
+            format!("„{name}“ eingeblendet")
+        } else {
+            format!("„{name}“ ausgeblendet")
+        };
+        self.report(res, msg);
     }
 
     fn selected_id(&self) -> Option<String> {
@@ -187,13 +210,17 @@ impl App {
         self.rows.resize(n, 0);
         self.offsets.resize(n, 0);
         self.col = self.col.min(n - 1);
-        if let Some((c, r)) = follow.and_then(|id| self.board.find(&id)) {
+        if let Some((c, r)) = follow
+            .and_then(|id| self.board.find(&id))
+            .filter(|&(c, _)| c < self.visible_columns())
+        {
             self.col = c;
             self.rows[c] = r;
         }
         for (c, col) in self.board.columns.iter().enumerate() {
             self.rows[c] = self.rows[c].min(col.tasks.len().saturating_sub(1));
         }
+        self.col = self.col.min(self.visible_columns() - 1);
     }
 
     /// Regelmäßig aufgerufen: Sync-Ergebnis abholen, externe Änderungen erkennen.
@@ -311,7 +338,7 @@ impl App {
             KeyCode::Right if shift => self.move_selected(1),
             KeyCode::Char('h') | KeyCode::Left => self.col = self.col.saturating_sub(1),
             KeyCode::Char('l') | KeyCode::Right => {
-                self.col = (self.col + 1).min(self.board.columns.len() - 1)
+                self.col = (self.col + 1).min(self.visible_columns() - 1)
             }
             KeyCode::Char('j') | KeyCode::Down => self.step(1),
             KeyCode::Char('k') | KeyCode::Up => self.step(-1),
@@ -353,6 +380,7 @@ impl App {
                 }
             }
             KeyCode::Char('f') => self.open_filter(),
+            KeyCode::Char('v') => self.toggle_show_done(),
             KeyCode::Char('b') => self.open_pick_bucket(),
             KeyCode::Char('s') => self.start_sync(),
             KeyCode::Char('R') => {
@@ -402,7 +430,11 @@ impl App {
         let defs = self.defs();
         let res = board::move_task(&mut task, &defs, target as usize, &Zoned::now());
         self.reload(Some(task.id.clone()));
-        self.report(res, format!("→ {}", defs[target as usize].name));
+        let mut msg = format!("→ {}", defs[target as usize].name);
+        if target as usize >= self.visible_columns() {
+            msg.push_str(" (ausgeblendet, v zeigt die Spalte)");
+        }
+        self.report(res, msg);
     }
 
     /// Erledigt bzw. wieder offen (erste Spalte); die Auswahl bleibt in der Spalte.

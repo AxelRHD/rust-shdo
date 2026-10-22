@@ -19,6 +19,9 @@ pub const DEFAULT_CONFIG: &str = r#"# shdo – lokale Einstellungen (werden nich
 
 # Angezeigte Buckets (leer = alle, "-" = ohne Bucket), wird über `f` in der TUI gesetzt
 # buckets = ["work"]
+
+# Spalte „Erledigt“ anzeigen, wird über `v` in der TUI gesetzt
+# show_done = true
 "#;
 
 #[derive(Debug, Default, serde::Deserialize)]
@@ -28,6 +31,7 @@ pub struct AppConfig {
     pub theme: Option<String>,
     #[serde(default)]
     pub buckets: Vec<String>,
+    pub show_done: Option<bool>,
 }
 
 pub fn config_dir() -> PathBuf {
@@ -85,6 +89,10 @@ impl AppConfig {
 
 /// Setzt einen String-Wert in der Config-Datei; Kommentare und andere Werte bleiben erhalten.
 pub fn set_value(path: &Path, key: &str, val: &str) -> Result<()> {
+    update(path, |doc| doc[key] = value(val))
+}
+
+pub fn set_bool(path: &Path, key: &str, val: bool) -> Result<()> {
     update(path, |doc| doc[key] = value(val))
 }
 
