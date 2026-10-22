@@ -102,6 +102,7 @@ them.
 | `1` `2` `3` | priority high / normal / low |
 | `D`, `r`, `b`, `d` | due date, rename, bucket, delete |
 | `⏎` | details with notes |
+| `/` | search titles, notes and IDs (live; `Esc` clears) |
 | `f` | bucket filter; create, rename and delete buckets |
 | `v` / `c` | show or hide the done column / the calendar |
 | `s` | sync with the git remote |

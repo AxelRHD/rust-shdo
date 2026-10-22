@@ -252,6 +252,7 @@ mod tests {
         .unwrap();
         let filter = Filter {
             buckets: filter.iter().map(|s| s.to_string()).collect(),
+            ..Filter::default()
         };
         Board::build(cfg, vec![], vec![], filter)
     }

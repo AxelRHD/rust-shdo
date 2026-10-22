@@ -994,3 +994,18 @@ setup.summary.holidays:
 setup.summary.later:
   en: "You can change this any time with `shdo setup`."
   de: "Ändern lässt sich das jederzeit mit `shdo setup`."
+kb.search:
+  en: "search"
+  de: "suchen"
+kb.clear_search:
+  en: "clear search"
+  de: "Suche löschen"
+search.hits:
+  en: "%{n} shown"
+  de: "%{n} angezeigt"
+help.general.search:
+  en: "search in titles, notes and IDs (live)"
+  de: "in Titeln, Notizen und IDs suchen (live)"
+help.general.esc_search:
+  en: "Esc clears an active search first"
+  de: "Esc löscht zuerst eine aktive Suche"

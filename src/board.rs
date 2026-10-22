@@ -12,10 +12,12 @@ use crate::task::Task;
 /// Filter entry for tasks without a (valid) bucket.
 pub const NO_BUCKET: &str = "-";
 
-/// Which buckets are shown. Empty = all.
+/// Which tasks are shown: selected buckets (empty = all) and an optional search text.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Filter {
     pub buckets: Vec<String>,
+    /// Case-insensitive search in title, note and ID; empty = no search.
+    pub query: String,
 }
 
 impl Filter {
@@ -40,6 +42,16 @@ impl Filter {
 
     fn matches(&self, bucket: &str) -> bool {
         self.is_all() || self.buckets.iter().any(|b| b == bucket)
+    }
+
+    /// Every word of the query must appear in the title, the note or the ID.
+    fn matches_query(&self, task: &Task) -> bool {
+        let query = self.query.trim().to_lowercase();
+        if query.is_empty() {
+            return true;
+        }
+        let haystack = format!("{}\n{}\n{}", task.title, task.note(), task.id).to_lowercase();
+        query.split_whitespace().all(|word| haystack.contains(word))
     }
 
     /// If exactly one real bucket is selected, new tasks inherit it.
@@ -124,7 +136,7 @@ impl Board {
             if idx != last {
                 bucket_counts[bucket_idx.unwrap_or(cfg.buckets.len())] += 1;
             }
-            if !filter.matches(key) {
+            if !filter.matches(key) || !filter.matches_query(&task) {
                 if idx != last {
                     hidden += 1;
                 }
@@ -355,6 +367,33 @@ mod tests {
         assert_eq!(board.find("b"), Some((0, 1)));
     }
 
+    #[test]
+    fn search_query() {
+        let cfg = parse_board("").unwrap();
+        let mut noted = task("n1", "");
+        noted.body = "\ncall the plumber about the leak\n".into();
+        let tasks = || vec![task("Rechnung", ""), task("Steuer", ""), noted.clone()];
+        let search = |q: &str| {
+            let f = Filter {
+                query: q.into(),
+                ..Filter::all()
+            };
+            let b = Board::build(cfg.clone(), tasks(), vec![], f);
+            (
+                ids(&b.columns[0].tasks)
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>(),
+                b.hidden,
+            )
+        };
+        assert_eq!(search("").0.len(), 3);
+        assert_eq!(search("RECH"), (vec!["Rechnung".to_string()], 2));
+        assert_eq!(search("plumber leak").0, ["n1"]);
+        assert_eq!(search("plumber roof").0.len(), 0);
+        assert_eq!(search("steu").0, ["Steuer"]);
+    }
+
     fn bucket_task(id: &str, bucket: &str) -> Task {
         task(id, &format!("bucket = \"{bucket}\""))
     }
@@ -381,6 +420,7 @@ mod tests {
 
         let work = Filter {
             buckets: vec!["work".into()],
+            ..Filter::default()
         };
         let b = Board::build(cfg.clone(), tasks(), vec![], work.clone());
         assert_eq!(ids(&b.columns[0].tasks), ["w"]);
@@ -390,6 +430,7 @@ mod tests {
 
         let none = Filter {
             buckets: vec![NO_BUCKET.into()],
+            ..Filter::default()
         };
         let b = Board::build(cfg.clone(), tasks(), vec![], none);
         assert_eq!(ids(&b.columns[0].tasks), ["n", "x"]);
@@ -398,10 +439,12 @@ mod tests {
         // Everything or only unknown entries selected = all
         let full = Filter {
             buckets: vec!["home".into(), "work".into(), "-".into()],
+            ..Filter::default()
         };
         assert!(full.normalized(&cfg.buckets).is_all());
         let stale = Filter {
             buckets: vec!["alt".into()],
+            ..Filter::default()
         };
         assert!(stale.normalized(&cfg.buckets).is_all());
         // Without declared buckets nothing is ever filtered

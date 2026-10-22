@@ -35,6 +35,10 @@ impl InputKind {
 
 pub enum Mode {
     Normal,
+    /// Live search; the query is applied while typing.
+    Search {
+        input: Input,
+    },
     Input {
         kind: InputKind,
         input: Input,
@@ -157,6 +161,7 @@ impl App {
             });
         let filter = Filter {
             buckets: cfg.buckets.clone(),
+            ..Filter::default()
         };
         let show_done = cfg.show_done.unwrap_or(true);
         let show_calendar = cfg.show_calendar.unwrap_or(true);
@@ -333,6 +338,15 @@ impl App {
         }
         match std::mem::replace(&mut self.mode, Mode::Normal) {
             Mode::Normal => self.normal_key(key),
+            Mode::Search { mut input } => match key.code {
+                KeyCode::Esc => self.set_query(String::new()),
+                KeyCode::Enter => {}
+                _ => {
+                    input.handle(key);
+                    self.set_query(input.text.clone());
+                    self.mode = Mode::Search { input };
+                }
+            },
             Mode::Input { kind, mut input } => match key.code {
                 KeyCode::Esc => {}
                 KeyCode::Enter => {
@@ -416,7 +430,15 @@ impl App {
         let shift = key.modifiers.contains(KeyModifiers::SHIFT);
         self.status = None;
         match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => self.quit = true,
+            KeyCode::Char('q') => self.quit = true,
+            // Esc first clears an active search, then quits
+            KeyCode::Esc if !self.filter.query.is_empty() => self.set_query(String::new()),
+            KeyCode::Esc => self.quit = true,
+            KeyCode::Char('/') => {
+                self.mode = Mode::Search {
+                    input: Input::with(&self.filter.query),
+                }
+            }
             KeyCode::Char('H') => self.move_selected(-1),
             KeyCode::Char('L') => self.move_selected(1),
             KeyCode::Left if shift => self.move_selected(-1),
@@ -706,12 +728,36 @@ impl App {
                 }
             })
             .collect();
-        Filter { buckets }.normalized(&self.board.buckets)
+        Filter {
+            buckets,
+            ..Filter::default()
+        }
+        .normalized(&self.board.buckets)
     }
 
     /// Applies the filter immediately (live preview); keeps the selected card if still visible.
+    /// Sets the search text and reloads, keeping the selected card if it still matches.
+    fn set_query(&mut self, query: String) {
+        self.filter.query = query;
+        let keep = self.selected_id();
+        self.reload(keep);
+    }
+
+    /// Number of tasks currently shown (all columns).
+    pub fn shown_count(&self) -> usize {
+        self.board.columns.iter().map(|c| c.tasks.len()).sum()
+    }
+
+    pub fn query(&self) -> &str {
+        &self.filter.query
+    }
+
     fn apply_filter(&mut self, filter: Filter) {
-        self.filter = filter;
+        // The bucket filter never touches an active search
+        self.filter = Filter {
+            query: std::mem::take(&mut self.filter.query),
+            ..filter
+        };
         let keep = self.selected_id();
         self.reload(keep);
     }

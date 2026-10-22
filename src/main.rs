@@ -123,6 +123,7 @@ fn run() -> Result<()> {
     let store = Store::new(cfg.data_dir(cli.dir.as_deref()));
     let filter = Filter {
         buckets: cfg.buckets.clone(),
+        ..Filter::default()
     };
     let all = Filter::all();
 
@@ -164,7 +165,13 @@ fn run() -> Result<()> {
         } => {
             let cfg = store.board_config()?;
             let key = board::resolve_bucket(&cfg.buckets, &b)?;
-            ls(&store, &Filter { buckets: vec![key] })
+            ls(
+                &store,
+                &Filter {
+                    buckets: vec![key],
+                    ..Filter::default()
+                },
+            )
         }
         Cmd::Ls { .. } => ls(&store, &filter),
         Cmd::Bucket { id, bucket } => {

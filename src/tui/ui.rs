@@ -72,6 +72,7 @@ const HELP: &[(&str, &[(&str, &str)])] = &[
     (
         "help.general",
         &[
+            ("/", "help.general.search"),
             ("s", "help.general.sync"),
             ("R", "help.general.reload"),
             ("v", "help.general.done_column"),
@@ -79,6 +80,7 @@ const HELP: &[(&str, &[(&str, &str)])] = &[
             ("t", "help.general.theme"),
             ("?", "help.general.help"),
             ("q / Esc", "help.general.quit"),
+            ("", "help.general.esc_search"),
         ],
     ),
     (
@@ -185,6 +187,13 @@ fn draw_header(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
         ),
     ]);
     let mut right = vec![Span::styled("[ ", Style::new().fg(c.dim))];
+    if !app.query().is_empty() {
+        right.push(Span::styled(
+            format!("/ {}", truncate(app.query(), 24)),
+            Style::new().fg(c.accent).bold(),
+        ));
+        right.push(Span::styled(" · ", Style::new().fg(c.dim)));
+    }
     if let Some(filter) = filter {
         right.push(Span::styled(filter, Style::new().fg(c.key).bold()));
         right.push(Span::styled(" · ", Style::new().fg(c.dim)));
@@ -443,6 +452,23 @@ fn truncate(s: &str, width: usize) -> String {
 }
 
 fn draw_status(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
+    if let Mode::Search { input } = &app.mode {
+        let label = " / ";
+        let hits = format!("   {}", t!("search.hits", n = app.shown_count()));
+        let line = Line::from(vec![
+            Span::styled(label, Style::new().fg(c.key).bold()),
+            Span::styled(input.text.clone(), Style::new().fg(c.fg)),
+            Span::styled(hits, Style::new().fg(c.dim)),
+        ]);
+        f.render_widget(Paragraph::new(line), area);
+        let before: String = input.text.chars().take(input.cursor).collect();
+        let x = area.x + (label.width() + before.width()) as u16;
+        f.set_cursor_position(Position {
+            x: x.min(area.right().saturating_sub(1)),
+            y: area.y,
+        });
+        return;
+    }
     if let Mode::Input { kind, input } = &app.mode {
         let label = format!(" {}: ", kind.label());
         let hint = match kind {
@@ -517,6 +543,7 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
             }
             k.push(("v", "kb.toggle_done"));
             k.push(("c", "kb.calendar"));
+            k.push(("/", "kb.search"));
             k.extend([
                 ("s", "kb.sync"),
                 ("t", "kb.theme"),
@@ -526,6 +553,7 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
             k
         }
         Mode::Input { .. } => vec![("⏎", "kb.save"), ("Esc", "kb.cancel"), ("^U", "kb.clear")],
+        Mode::Search { .. } => vec![("⏎", "kb.apply"), ("Esc", "kb.clear_search")],
         Mode::Form(form) => {
             let mut k = vec![("Tab/↓", "kb.next_field"), ("⇧Tab/↑", "kb.prev_field")];
             if !form.focused().is_text() {

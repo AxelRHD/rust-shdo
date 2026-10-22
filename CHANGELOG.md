@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Live search with `/` in titles, notes and IDs; works together with the bucket filter
+  and the calendar counts, `Esc` clears it
+- Releases publish to crates.io via trusted publishing
+
 ## 0.1.0 - 2026-10-22
 
 First release.
