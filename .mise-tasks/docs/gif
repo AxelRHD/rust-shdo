@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#MISE description="docs/demo.gif mit vhs aufnehmen (braucht vhs, ttyd und ffmpeg)"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT"
+for tool in vhs ttyd ffmpeg; do
+  command -v "$tool" >/dev/null || { echo "❌ $tool fehlt"; exit 1; }
+done
+cargo build -q --release
+work="$MISE_PROJECT_ROOT/target/gif"
+rm -rf "$work"
+# A separate HOME for the recording, so the board header shows ~/.local/share/shdo
+export SHDO_GIF_HOME="$work/home"
+data="$SHDO_GIF_HOME/.local/share/shdo"
+mkdir -p "$work/bin" "$work/config" "$SHDO_GIF_HOME"
+export SHDO_CONFIG_DIR="$work/config"
+printf 'language = "en"\nholidays = "de-bw"\ntheme = "tokyonight"\n' > "$SHDO_CONFIG_DIR/config.toml"
+# Wrapper so the tape can just type `shdo`
+cat > "$work/bin/shdo" <<WRAP
+#!/usr/bin/env bash
+exec "$MISE_PROJECT_ROOT/target/release/shdo" --dir "$data" "\$@"
+WRAP
+chmod +x "$work/bin/shdo"
+export PATH="$work/bin:$PATH"
+
+shdo init >/dev/null
+printf '\n[[buckets]]\nkey = "home"\nname = "Home"\n\n[[buckets]]\nkey = "work"\nname = "Work"\n' >> "$data/shdo.toml"
+shdo Pay electricity bill P1 due:tomorrow @home >/dev/null
+id=$(shdo Quarterly report P1 due:+4d @work | cut -d' ' -f1)
+printf '\n- [x] collect numbers\n- [ ] write summary\n- [ ] send to team\n' >> "$data/tasks/$id.md"
+shdo Renew passport due:+1m @home >/dev/null
+shdo Fix bike light P3 @home >/dev/null
+id=$(shdo Review pull request due:today @work | cut -d' ' -f1); shdo mv "$id" doing >/dev/null
+id=$(shdo Reply from landlord @home | cut -d' ' -f1); shdo mv "$id" wait >/dev/null
+id=$(shdo Send invoice @work | cut -d' ' -f1); shdo done "$id" >/dev/null
+
+echo "🎬 Nehme docs/demo.gif auf …"
+vhs docs/demo.tape
+echo "✅ docs/demo.gif ($(du -h docs/demo.gif | cut -f1))"
