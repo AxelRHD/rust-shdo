@@ -60,6 +60,28 @@ pub enum Mode {
     PickBucket {
         idx: usize,
     },
+    BucketNew {
+        name: Input,
+        key: Input,
+        /// key von Hand geändert – dann nicht mehr aus dem Namen ableiten
+        key_edited: bool,
+        focus_key: bool,
+    },
+    BucketRename {
+        key: String,
+        input: Input,
+    },
+    BucketDelete {
+        key: String,
+        open: usize,
+        done: usize,
+        idx: usize,
+    },
+    /// Ziel für die Tasks eines zu löschenden Buckets (nur andere Buckets).
+    BucketMove {
+        key: String,
+        idx: usize,
+    },
 }
 
 #[derive(Clone, Copy)]
@@ -67,6 +89,25 @@ pub enum Level {
     Info,
     Ok,
     Error,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum DeleteChoice {
+    Delete,
+    Unassign,
+    Move,
+    ArchiveDone,
+    Cancel,
+}
+
+/// Was beim Löschen eines Buckets mit seinen Tasks passiert.
+enum Retarget {
+    /// Bucket ist leer
+    Keep,
+    /// Bucket der Tasks ersetzen (None = ohne Bucket)
+    To(Option<String>),
+    /// alle (erledigten) Tasks archivieren
+    Archive,
 }
 
 pub struct App {
@@ -357,6 +398,20 @@ impl App {
                 original,
             } => self.filter_key(key, idx, checked, original),
             Mode::PickBucket { idx } => self.pick_bucket_key(key, idx),
+            Mode::BucketNew {
+                name,
+                key: key_input,
+                key_edited,
+                focus_key,
+            } => self.bucket_new_key(key, name, key_input, key_edited, focus_key),
+            Mode::BucketRename { key: bucket, input } => self.bucket_rename_key(key, bucket, input),
+            Mode::BucketDelete {
+                key: bucket,
+                open,
+                done,
+                idx,
+            } => self.bucket_delete_key(key, bucket, open, done, idx),
+            Mode::BucketMove { key: bucket, idx } => self.bucket_move_key(key, bucket, idx),
         }
     }
 
@@ -622,9 +677,11 @@ impl App {
     }
 
     fn open_filter(&mut self) {
-        if self.no_buckets() {
-            return;
-        }
+        self.open_filter_at(0);
+    }
+
+    /// Filter-Popup (wieder) öffnen, Cursor auf Zeile `idx`.
+    fn open_filter_at(&mut self, idx: usize) {
         let f = &self.board.filter;
         let mut checked: Vec<bool> = self
             .board
@@ -633,8 +690,9 @@ impl App {
             .map(|b| f.is_all() || f.buckets.contains(&b.key))
             .collect();
         checked.push(f.is_all() || f.buckets.iter().any(|b| b == NO_BUCKET));
+        let idx = idx.min(checked.len() - 1);
         self.mode = Mode::Filter {
-            idx: 0,
+            idx,
             checked,
             original: self.filter.clone(),
         };
@@ -709,6 +767,38 @@ impl App {
                 self.apply_filter(original);
                 return;
             }
+            KeyCode::Char('n') => {
+                self.mode = Mode::BucketNew {
+                    name: Input::default(),
+                    key: Input::default(),
+                    key_edited: false,
+                    focus_key: false,
+                };
+                return;
+            }
+            KeyCode::Char('r') if idx < self.board.buckets.len() => {
+                let b = &self.board.buckets[idx];
+                self.mode = Mode::BucketRename {
+                    key: b.key.clone(),
+                    input: Input::with(&b.name),
+                };
+                return;
+            }
+            KeyCode::Char('d') if idx < self.board.buckets.len() => {
+                let key = self.board.buckets[idx].key.clone();
+                match self.bucket_counts(&key) {
+                    Ok((open, done)) => {
+                        self.mode = Mode::BucketDelete {
+                            key,
+                            open,
+                            done,
+                            idx: 0,
+                        };
+                        return;
+                    }
+                    Err(e) => self.set_status(Level::Error, format!("{e:#}")),
+                }
+            }
             _ => {}
         }
         self.mode = Mode::Filter {
@@ -716,6 +806,267 @@ impl App {
             checked,
             original,
         };
+    }
+
+    fn bucket_index(&self, key: &str) -> usize {
+        self.board
+            .buckets
+            .iter()
+            .position(|b| b.key == key)
+            .unwrap_or(0)
+    }
+
+    /// (offen, erledigt) aller Tasks im Bucket, unabhängig vom Filter.
+    fn bucket_counts(&self, key: &str) -> Result<(usize, usize)> {
+        let done_key = &self.board.columns[self.board.last_index()].def.key;
+        let tasks = self.store.tasks_in_bucket(key)?;
+        let done = tasks.iter().filter(|t| &t.status == done_key).count();
+        Ok((tasks.len() - done, done))
+    }
+
+    fn bucket_new_key(
+        &mut self,
+        key: KeyEvent,
+        mut name: Input,
+        mut key_input: Input,
+        mut key_edited: bool,
+        mut focus_key: bool,
+    ) {
+        match key.code {
+            KeyCode::Esc => return self.open_filter_at(0),
+            KeyCode::Tab | KeyCode::BackTab | KeyCode::Up | KeyCode::Down => focus_key = !focus_key,
+            KeyCode::Enter => {
+                let res = self.store.add_bucket(&key_input.text, &name.text);
+                match res {
+                    Ok(()) => {
+                        let new_key = key_input.text.trim().to_string();
+                        let keep = self.selected_id();
+                        self.reload(keep);
+                        let idx = self.bucket_index(&new_key);
+                        self.open_filter_at(idx);
+                        self.set_status(
+                            Level::Ok,
+                            format!("Bucket „{}“ (@{new_key}) angelegt", name.text.trim()),
+                        );
+                        return;
+                    }
+                    Err(e) => self.set_status(Level::Error, format!("{e:#}")),
+                }
+            }
+            _ if focus_key => {
+                key_input.handle(key);
+                key_edited = true;
+            }
+            _ => {
+                name.handle(key);
+                if !key_edited {
+                    key_input = Input::with(&crate::store::key_from_name(&name.text));
+                }
+            }
+        }
+        self.mode = Mode::BucketNew {
+            name,
+            key: key_input,
+            key_edited,
+            focus_key,
+        };
+    }
+
+    fn bucket_rename_key(&mut self, key: KeyEvent, bucket: String, mut input: Input) {
+        match key.code {
+            KeyCode::Esc => self.open_filter_at(self.bucket_index(&bucket)),
+            KeyCode::Enter => match self.store.rename_bucket(&bucket, &input.text) {
+                Ok(()) => {
+                    let keep = self.selected_id();
+                    self.reload(keep);
+                    self.open_filter_at(self.bucket_index(&bucket));
+                    self.set_status(Level::Ok, format!("umbenannt: {}", input.text.trim()));
+                }
+                Err(e) => {
+                    self.set_status(Level::Error, format!("{e:#}"));
+                    self.mode = Mode::BucketRename { key: bucket, input };
+                }
+            },
+            _ => {
+                input.handle(key);
+                self.mode = Mode::BucketRename { key: bucket, input };
+            }
+        }
+    }
+
+    /// Wahlmöglichkeiten beim Löschen: (Aktion, erlaubt, Text).
+    pub fn delete_choices(&self, open: usize, done: usize) -> Vec<(DeleteChoice, bool, String)> {
+        if open + done == 0 {
+            return vec![
+                (DeleteChoice::Delete, true, "Bucket löschen".into()),
+                (DeleteChoice::Cancel, true, "Abbrechen".into()),
+            ];
+        }
+        let others = self.board.buckets.len() > 1;
+        let archive_text = if open > 0 {
+            format!("Erledigte archivieren und löschen (noch {open} offen)")
+        } else {
+            "Erledigte archivieren und Bucket löschen".into()
+        };
+        vec![
+            (
+                DeleteChoice::Unassign,
+                true,
+                "Bucket aus den Tasks entfernen".into(),
+            ),
+            (
+                DeleteChoice::Move,
+                others,
+                "Tasks in anderen Bucket verschieben …".into(),
+            ),
+            (DeleteChoice::ArchiveDone, open == 0, archive_text),
+            (DeleteChoice::Cancel, true, "Abbrechen".into()),
+        ]
+    }
+
+    fn bucket_delete_key(
+        &mut self,
+        key: KeyEvent,
+        bucket: String,
+        open: usize,
+        done: usize,
+        idx: usize,
+    ) {
+        let choices = self.delete_choices(open, done);
+        let n = choices.len();
+        let back = self.bucket_index(&bucket);
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.mode = Mode::BucketDelete {
+                    key: bucket,
+                    open,
+                    done,
+                    idx: (idx + 1) % n,
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.mode = Mode::BucketDelete {
+                    key: bucket,
+                    open,
+                    done,
+                    idx: (idx + n - 1) % n,
+                }
+            }
+            KeyCode::Esc | KeyCode::Char('q') => self.open_filter_at(back),
+            KeyCode::Enter => {
+                let (choice, enabled, _) = &choices[idx];
+                if !enabled {
+                    self.set_status(Level::Info, "nicht möglich – siehe Hinweis");
+                    self.mode = Mode::BucketDelete {
+                        key: bucket,
+                        open,
+                        done,
+                        idx,
+                    };
+                    return;
+                }
+                match choice {
+                    DeleteChoice::Cancel => self.open_filter_at(back),
+                    DeleteChoice::Move => {
+                        self.mode = Mode::BucketMove {
+                            key: bucket,
+                            idx: 0,
+                        }
+                    }
+                    DeleteChoice::Delete => self.finish_bucket_delete(&bucket, Retarget::Keep),
+                    DeleteChoice::Unassign => {
+                        self.finish_bucket_delete(&bucket, Retarget::To(None))
+                    }
+                    DeleteChoice::ArchiveDone => {
+                        self.finish_bucket_delete(&bucket, Retarget::Archive)
+                    }
+                }
+            }
+            _ => {
+                self.mode = Mode::BucketDelete {
+                    key: bucket,
+                    open,
+                    done,
+                    idx,
+                }
+            }
+        }
+    }
+
+    /// Ziele beim Verschieben: alle anderen Buckets.
+    pub fn move_targets(&self, bucket: &str) -> Vec<(String, String)> {
+        self.board
+            .buckets
+            .iter()
+            .filter(|b| b.key != bucket)
+            .map(|b| (b.key.clone(), b.name.clone()))
+            .collect()
+    }
+
+    fn bucket_move_key(&mut self, key: KeyEvent, bucket: String, idx: usize) {
+        let targets = self.move_targets(&bucket);
+        let n = targets.len().max(1);
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.mode = Mode::BucketMove {
+                    key: bucket,
+                    idx: (idx + 1) % n,
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.mode = Mode::BucketMove {
+                    key: bucket,
+                    idx: (idx + n - 1) % n,
+                }
+            }
+            KeyCode::Esc | KeyCode::Char('q') => self.open_filter_at(self.bucket_index(&bucket)),
+            KeyCode::Enter => match targets.get(idx) {
+                Some((target, _)) => {
+                    let target = target.clone();
+                    self.finish_bucket_delete(&bucket, Retarget::To(Some(target)));
+                }
+                None => self.open_filter_at(0),
+            },
+            _ => self.mode = Mode::BucketMove { key: bucket, idx },
+        }
+    }
+
+    fn finish_bucket_delete(&mut self, bucket: &str, retarget: Retarget) {
+        let name = self.board.bucket_name(bucket).to_string();
+        let res = (|| -> Result<String> {
+            let tasks = self.store.tasks_in_bucket(bucket)?;
+            let n = tasks.len();
+            let what = match &retarget {
+                Retarget::Keep => String::new(),
+                Retarget::To(None) => format!(", {n} Task(s) jetzt ohne Bucket"),
+                Retarget::To(Some(t)) => format!(", {n} Task(s) → {}", self.board.bucket_name(t)),
+                Retarget::Archive => format!(", {n} erledigte Task(s) archiviert"),
+            };
+            for mut t in tasks {
+                match &retarget {
+                    Retarget::Keep => {}
+                    Retarget::To(target) => {
+                        t.set_bucket(target.as_deref());
+                        t.save()?;
+                    }
+                    Retarget::Archive => self.store.archive(&t)?,
+                }
+            }
+            self.store.remove_bucket(bucket)?;
+            // Aus dem gespeicherten Filter entfernen, sonst bleibt ein toter Eintrag stehen
+            if self.filter.buckets.iter().any(|b| b == bucket) {
+                self.filter.buckets.retain(|b| b != bucket);
+                config::set_list(&self.cfg_path, "buckets", &self.filter.buckets)?;
+            }
+            Ok(what)
+        })();
+        let keep = self.selected_id();
+        self.reload(keep);
+        self.open_filter_at(0);
+        match res {
+            Ok(what) => self.set_status(Level::Ok, format!("Bucket „{name}“ gelöscht{what}")),
+            Err(e) => self.set_status(Level::Error, format!("{e:#}")),
+        }
     }
 
     fn open_pick_bucket(&mut self) {

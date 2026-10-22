@@ -127,6 +127,95 @@ impl Store {
         parse_board(&raw).with_context(|| format!("{} ungültig", path.display()))
     }
 
+    fn board_doc(&self) -> Result<toml_edit::DocumentMut> {
+        let path = self.dir.join(BOARD_FILE);
+        let raw = match fs::read_to_string(&path) {
+            Ok(raw) => raw,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => DEFAULT_BOARD.into(),
+            Err(e) => return Err(e).with_context(|| format!("{} lesen", path.display())),
+        };
+        raw.parse()
+            .with_context(|| format!("{} ungültig", path.display()))
+    }
+
+    fn save_board_doc(&self, doc: &toml_edit::DocumentMut) -> Result<()> {
+        let raw = doc.to_string();
+        parse_board(&raw).context("Änderung würde shdo.toml ungültig machen")?;
+        let path = self.dir.join(BOARD_FILE);
+        fs::write(&path, raw).with_context(|| format!("{} schreiben", path.display()))
+    }
+
+    /// Neuen Bucket an `shdo.toml` anhängen; Kommentare bleiben erhalten.
+    pub fn add_bucket(&self, key: &str, name: &str) -> Result<()> {
+        let key = key.trim();
+        let name = name.trim();
+        if name.is_empty() {
+            bail!("Name fehlt");
+        }
+        validate_bucket_key(key)?;
+        let cfg = self.board_config()?;
+        if cfg.buckets.iter().any(|b| b.key == key) {
+            bail!("Bucket-key „{key}“ gibt es schon");
+        }
+        let mut doc = self.board_doc()?;
+        let mut table = toml_edit::Table::new();
+        table["key"] = toml_edit::value(key);
+        table["name"] = toml_edit::value(name);
+        match doc
+            .get_mut("buckets")
+            .and_then(|i| i.as_array_of_tables_mut())
+        {
+            Some(arr) => arr.push(table),
+            None => {
+                let mut arr = toml_edit::ArrayOfTables::new();
+                arr.push(table);
+                doc["buckets"] = toml_edit::Item::ArrayOfTables(arr);
+            }
+        }
+        self.save_board_doc(&doc)
+    }
+
+    /// Anzeigenamen eines Buckets ändern; der key (und damit die Tasks) bleibt.
+    pub fn rename_bucket(&self, key: &str, name: &str) -> Result<()> {
+        let name = name.trim();
+        if name.is_empty() {
+            bail!("Name fehlt");
+        }
+        let mut doc = self.board_doc()?;
+        let table = bucket_tables(&mut doc)
+            .find(|t| t.get("key").and_then(|k| k.as_str()) == Some(key))
+            .with_context(|| format!("Bucket „{key}“ nicht gefunden"))?;
+        table["name"] = toml_edit::value(name);
+        self.save_board_doc(&doc)
+    }
+
+    /// Bucket aus `shdo.toml` entfernen. Was mit den Tasks passiert, entscheidet der Aufrufer.
+    pub fn remove_bucket(&self, key: &str) -> Result<()> {
+        let mut doc = self.board_doc()?;
+        let arr = doc
+            .get_mut("buckets")
+            .and_then(|i| i.as_array_of_tables_mut())
+            .with_context(|| format!("Bucket „{key}“ nicht gefunden"))?;
+        let idx = arr
+            .iter()
+            .position(|t| t.get("key").and_then(|k| k.as_str()) == Some(key))
+            .with_context(|| format!("Bucket „{key}“ nicht gefunden"))?;
+        arr.remove(idx);
+        if arr.is_empty() {
+            doc.remove("buckets");
+        }
+        self.save_board_doc(&doc)
+    }
+
+    /// Alle Tasks (ohne Archiv) in einem Bucket.
+    pub fn tasks_in_bucket(&self, key: &str) -> Result<Vec<Task>> {
+        let (tasks, _) = self.load_tasks()?;
+        Ok(tasks
+            .into_iter()
+            .filter(|t| t.bucket.as_deref() == Some(key))
+            .collect())
+    }
+
     /// Lädt alle Tasks aus `tasks/`. Ungültige Dateien landen als Warnung im zweiten Wert.
     pub fn load_tasks(&self) -> Result<(Vec<Task>, Vec<String>)> {
         let mut tasks = Vec::new();
@@ -268,6 +357,46 @@ fn validate_keys(defs: &[StatusDef], what: &str) -> Result<()> {
 
 /// Findet einen Eintrag über key oder Name (Groß-/Kleinschreibung egal);
 /// sonst über einen eindeutigen Präfix von key oder einem Wort des Namens.
+fn bucket_tables(doc: &mut toml_edit::DocumentMut) -> impl Iterator<Item = &mut toml_edit::Table> {
+    doc.get_mut("buckets")
+        .and_then(|i| i.as_array_of_tables_mut())
+        .into_iter()
+        .flat_map(|arr| arr.iter_mut())
+}
+
+fn validate_bucket_key(key: &str) -> Result<()> {
+    if key.is_empty() {
+        bail!("key fehlt");
+    }
+    if key == crate::board::NO_BUCKET {
+        bail!("„{key}“ ist reserviert");
+    }
+    if !key
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+    {
+        bail!("key „{key}“: nur a–z, 0–9, - und _ (wird als @{key} getippt)");
+    }
+    Ok(())
+}
+
+/// Vorschlag für einen key aus dem Namen: „Bücher & Co.“ → `buecher-co`.
+pub fn key_from_name(name: &str) -> String {
+    let mut out = String::new();
+    for ch in name.trim().to_lowercase().chars() {
+        match ch {
+            'ä' => out.push_str("ae"),
+            'ö' => out.push_str("oe"),
+            'ü' => out.push_str("ue"),
+            'ß' => out.push_str("ss"),
+            c if c.is_ascii_alphanumeric() => out.push(c),
+            _ if !out.ends_with('-') && !out.is_empty() => out.push('-'),
+            _ => {}
+        }
+    }
+    out.trim_end_matches('-').to_string()
+}
+
 pub fn resolve_def(defs: &[StatusDef], input: &str) -> Option<usize> {
     let q = input.trim().to_lowercase();
     if q.is_empty() {
@@ -346,6 +475,34 @@ mod tests {
         assert_eq!(resolve_def(&cfg.buckets, "arb"), Some(1));
         assert_eq!(resolve_def(&cfg.buckets, "HOME"), Some(0));
         assert_eq!(resolve_def(&cfg.buckets, ""), None);
+    }
+
+    #[test]
+    fn bucket_management_keeps_comments() {
+        let (_tmp, s) = store();
+        s.add_bucket("home", "Privat").unwrap();
+        s.add_bucket("work", "Arbeit").unwrap();
+        assert!(s.add_bucket("work", "Doppelt").is_err());
+        assert!(s.add_bucket("Gross", "x").is_err());
+        assert!(s.add_bucket("-", "x").is_err());
+        assert!(s.add_bucket("ok", " ").is_err());
+        s.rename_bucket("work", "Job").unwrap();
+        let cfg = s.board_config().unwrap();
+        let names: Vec<_> = cfg.buckets.iter().map(|b| b.name.as_str()).collect();
+        assert_eq!(names, ["Privat", "Job"]);
+        s.remove_bucket("home").unwrap();
+        s.remove_bucket("work").unwrap();
+        assert!(s.remove_bucket("work").is_err());
+        assert!(s.board_config().unwrap().buckets.is_empty());
+        let raw = fs::read_to_string(s.dir.join(BOARD_FILE)).unwrap();
+        assert!(raw.contains("# Optionale Buckets"), "{raw}");
+    }
+
+    #[test]
+    fn key_suggestions() {
+        assert_eq!(key_from_name("Verein"), "verein");
+        assert_eq!(key_from_name("Bücher & Co."), "buecher-co");
+        assert_eq!(key_from_name("  Große Straße 2 "), "grosse-strasse-2");
     }
 
     #[test]

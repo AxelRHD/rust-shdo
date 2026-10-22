@@ -340,6 +340,16 @@ Global: --dir <pfad>
 - `Space`/`x` an/aus, `o` nur dieser, `a` alle; wirkt sofort als Vorschau
 - `Enter` speichert in `config.toml`, `Esc` stellt den vorherigen Filter wieder her
 - Alles oder nichts gewählt = alle
+- Buckets verwalten direkt im Popup (auch wenn noch keine existieren):
+  - `n` neu: Name und Key (Key wird aus dem Namen vorgeschlagen, „Bücher & Co“ → `buecher-co`;
+    erlaubt a–z, 0–9, `-`, `_`)
+  - `r` umbenennen: nur der Anzeigename, der Key in den Tasks bleibt
+  - `d` löschen: leerer Bucket nach Rückfrage; mit Tasks Auswahl aus
+    „Bucket aus den Tasks entfernen“, „Tasks in anderen Bucket verschieben …“ und
+    „Erledigte archivieren und Bucket löschen“ (nur ohne offene Tasks; archivieren statt
+    löschen, damit nichts verloren geht und keine Warnungen bleiben)
+  - Änderungen an `shdo.toml` über `toml_edit` (Kommentare bleiben), werden vor dem Schreiben
+    validiert; ein gelöschter Bucket verschwindet auch aus dem gespeicherten Filter
 - Änderungen werden sofort gespeichert
 - Externe Änderungen (z. B. `shdo …` in einem anderen Pane) werden per Fingerprint
   (Dateien, mtime, Größe) alle 500 ms erkannt und neu geladen

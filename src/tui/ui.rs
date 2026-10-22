@@ -59,6 +59,10 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
         "Buckets",
         &[
             ("f", "Filter: welche Buckets angezeigt werden"),
+            (
+                "n / r / d",
+                "im Filter: Bucket anlegen / umbenennen / löschen",
+            ),
             ("Space / x", "im Filter: an/aus (wirkt sofort)"),
             ("o", "im Filter: nur dieser"),
             ("a", "im Filter: alle an/aus"),
@@ -131,6 +135,20 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::Form(form) => draw_form(f, app, &c, form),
         Mode::Filter { idx, checked, .. } => draw_filter(f, app, &c, *idx, checked),
         Mode::PickBucket { idx } => draw_pick_bucket(f, app, &c, *idx),
+        Mode::BucketNew {
+            name,
+            key,
+            focus_key,
+            ..
+        } => draw_bucket_new(f, &c, name, key, *focus_key),
+        Mode::BucketRename { key, input } => draw_bucket_rename(f, &c, key, input),
+        Mode::BucketDelete {
+            key,
+            open,
+            done,
+            idx,
+        } => draw_bucket_delete(f, app, &c, key, *open, *done, *idx),
+        Mode::BucketMove { key, idx } => draw_bucket_move(f, app, &c, key, *idx),
         _ => {}
     }
 }
@@ -484,8 +502,9 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
                 ("x", "erledigt"),
                 ("⏎", "Details"),
             ];
+            k.push(("f", if has_buckets { "Filter" } else { "Buckets" }));
             if has_buckets {
-                k.extend([("f", "Filter"), ("b", "Bucket")]);
+                k.push(("b", "Bucket"));
             }
             k.push(("v", "Erledigt ein/aus"));
             k.push(("c", "Kalender"));
@@ -519,9 +538,21 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
             ("Space", "an/aus"),
             ("o", "nur dieser"),
             ("a", "alle"),
+            ("n", "neuer Bucket"),
+            ("r", "umbenennen"),
+            ("d", "löschen"),
             ("⏎", "speichern"),
             ("Esc", "verwerfen"),
         ],
+        Mode::BucketNew { .. } => vec![("Tab", "Name/Key"), ("⏎", "anlegen"), ("Esc", "abbrechen")],
+        Mode::BucketRename { .. } => vec![("⏎", "speichern"), ("Esc", "abbrechen")],
+        Mode::BucketDelete { .. } | Mode::BucketMove { .. } => {
+            vec![
+                ("j/k", "auswählen"),
+                ("⏎", "ausführen"),
+                ("Esc", "abbrechen"),
+            ]
+        }
         Mode::PickBucket { .. } => {
             vec![("j/k", "auswählen"), ("⏎", "setzen"), ("Esc", "abbrechen")]
         }
@@ -976,7 +1007,170 @@ fn draw_filter(f: &mut Frame, app: &App, c: &Palette, idx: usize, checked: &[boo
             ])
         })
         .collect();
-    let inner = popup(f, c, "Filter · Buckets", 36, lines.len() as u16 + 2);
+    let mut lines = lines;
+    if app.board.buckets.is_empty() {
+        lines.insert(
+            0,
+            Line::from(Span::styled(
+                "  noch keine Buckets – n legt einen an",
+                Style::new().fg(c.dim),
+            )),
+        );
+    }
+    let inner = popup(f, c, "Filter · Buckets", 42, lines.len() as u16 + 2);
+    f.render_widget(Paragraph::new(lines), inner);
+}
+
+/// Eingabefeld-Zeile mit Label; liefert bei Fokus die Cursor-Position mit.
+fn field_line(
+    c: &Palette,
+    at: Position,
+    width: u16,
+    label: &str,
+    input: &Input,
+    focused: bool,
+    hint: &str,
+) -> (Line<'static>, Option<Position>) {
+    const LABEL: usize = 8;
+    let style = if focused {
+        Style::new().fg(c.key).bold()
+    } else {
+        Style::new().fg(c.dim)
+    };
+    let avail = (width as usize).saturating_sub(LABEL + 2 + hint.width());
+    let (visible, cx) = input_view(input, avail.max(4));
+    let cursor = focused.then(|| Position {
+        x: at.x + (LABEL + 2 + cx) as u16,
+        y: at.y,
+    });
+    let line = Line::from(vec![
+        Span::styled(if focused { "▸ " } else { "  " }, style),
+        Span::styled(format!("{label:<LABEL$}"), style),
+        Span::styled(visible, Style::new().fg(c.fg)),
+        Span::styled(hint.to_string(), Style::new().fg(c.dim)),
+    ]);
+    (line, cursor)
+}
+
+fn row(area: Rect, n: u16) -> Position {
+    Position {
+        x: area.x,
+        y: area.y + n,
+    }
+}
+
+fn draw_bucket_new(f: &mut Frame, c: &Palette, name: &Input, key: &Input, focus_key: bool) {
+    let inner = popup(f, c, "Neuer Bucket", 48, 5);
+    let hint = if key.text.is_empty() {
+        String::new()
+    } else {
+        format!("  → @{}", key.text)
+    };
+    let (name_line, c1) = field_line(c, row(inner, 0), inner.width, "Name", name, !focus_key, "");
+    let (key_line, c2) = field_line(c, row(inner, 1), inner.width, "Key", key, focus_key, &hint);
+    let lines = vec![
+        name_line,
+        key_line,
+        Line::from(Span::styled(
+            "  Key steht in den Task-Dateien, a–z 0–9 - _",
+            Style::new().fg(c.dim),
+        )),
+    ];
+    f.render_widget(Paragraph::new(lines), inner);
+    if let Some(pos) = c1.or(c2) {
+        f.set_cursor_position(pos);
+    }
+}
+
+fn draw_bucket_rename(f: &mut Frame, c: &Palette, key: &str, input: &Input) {
+    let inner = popup(f, c, &format!("Bucket umbenennen · @{key}"), 48, 4);
+    let (line, cursor) = field_line(c, row(inner, 0), inner.width, "Name", input, true, "");
+    let lines = vec![
+        line,
+        Line::from(Span::styled(
+            "  nur der Anzeigename, Tasks bleiben unverändert",
+            Style::new().fg(c.dim),
+        )),
+    ];
+    f.render_widget(Paragraph::new(lines), inner);
+    if let Some(pos) = cursor {
+        f.set_cursor_position(pos);
+    }
+}
+
+fn draw_bucket_delete(
+    f: &mut Frame,
+    app: &App,
+    c: &Palette,
+    key: &str,
+    open: usize,
+    done: usize,
+    idx: usize,
+) {
+    let name = app.board.bucket_name(key).to_string();
+    let choices = app.delete_choices(open, done);
+    let summary = if open + done == 0 {
+        "Der Bucket ist leer.".to_string()
+    } else {
+        format!("{} Task(s): {open} offen, {done} erledigt", open + done)
+    };
+    let mut lines = vec![
+        Line::from(Span::styled(summary, Style::new().fg(c.warn))),
+        Line::default(),
+    ];
+    for (i, (_, enabled, text)) in choices.iter().enumerate() {
+        let sel = i == idx;
+        let style = match (enabled, sel) {
+            (false, _) => Style::new().fg(c.dim),
+            (true, true) => Style::new().bold(),
+            (true, false) => Style::new(),
+        };
+        lines.push(Line::from(vec![
+            Span::styled(
+                if sel { "→ " } else { "  " },
+                Style::new().fg(c.border_active),
+            ),
+            Span::styled(text.clone(), style),
+        ]));
+    }
+    let inner = popup(
+        f,
+        c,
+        &format!("Bucket „{name}“ löschen?"),
+        56,
+        lines.len() as u16 + 2,
+    );
+    f.render_widget(Paragraph::new(lines), inner);
+}
+
+fn draw_bucket_move(f: &mut Frame, app: &App, c: &Palette, key: &str, idx: usize) {
+    let lines: Vec<Line> = app
+        .move_targets(key)
+        .into_iter()
+        .enumerate()
+        .map(|(i, (k, name))| {
+            let sel = i == idx;
+            Line::from(vec![
+                Span::styled(
+                    if sel { "→ " } else { "  " },
+                    Style::new().fg(c.border_active),
+                ),
+                Span::styled(
+                    format!("{name}  @{k}"),
+                    if sel {
+                        Style::new().bold()
+                    } else {
+                        Style::new()
+                    },
+                ),
+            ])
+        })
+        .collect();
+    let title = format!(
+        "Tasks von „{}“ verschieben nach",
+        app.board.bucket_name(key)
+    );
+    let inner = popup(f, c, &title, 48, lines.len() as u16 + 2);
     f.render_widget(Paragraph::new(lines), inner);
 }
 
