@@ -71,8 +71,12 @@ enum Cmd {
     Archive,
     /// Datenverzeichnis anlegen (inkl. git init)
     Init,
-    /// Completion-Skript ausgeben, z. B. `shdo completions fish > ~/.config/fish/completions/shdo.fish`
-    Completions { shell: clap_complete::Shell },
+    /// Completion-Skript für die Shell ausgeben (ohne Argument: Anleitung)
+    #[command(after_help = completion::SETUP_HELP)]
+    Completions {
+        /// Shell, für die das Skript erzeugt wird
+        shell: Option<clap_complete::Shell>,
+    },
     /// Intern: dynamische Vorschläge für die Completion
     #[command(name = "__complete", hide = true)]
     Complete { kind: completion::Kind },
@@ -118,8 +122,12 @@ fn run() -> Result<()> {
     };
     match &cmd {
         Cmd::Text(words) => guard_typo(words)?,
-        Cmd::Completions { shell } => {
+        Cmd::Completions { shell: Some(shell) } => {
             completion::print_script(*shell, &mut Cli::command());
+            return Ok(());
+        }
+        Cmd::Completions { shell: None } => {
+            print!("{}", completion::setup_guide());
             return Ok(());
         }
         // Completion soll nie mit Fehlern stören

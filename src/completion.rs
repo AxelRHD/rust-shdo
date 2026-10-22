@@ -75,6 +75,39 @@ complete -c shdo -n 'string match -q -- "@*" (commandline -ct)' -f -a '(__shdo_c
 complete -c shdo -n 'string match -q -- "due:*" (commandline -ct)' -f -a '(__shdo_complete due)'
 "#;
 
+pub const SETUP_HELP: &str = "\
+Einrichten:
+  fish  shdo completions fish > ~/.config/fish/completions/shdo.fish
+  bash  shdo completions bash > ~/.local/share/bash-completion/completions/shdo
+  zsh   shdo completions zsh > ~/.zfunc/_shdo
+        (in ~/.zshrc vor compinit: fpath+=~/.zfunc)
+
+Danach eine neue Shell öffnen. Nach einem Update von shdo den Befehl
+erneut ausführen, damit neue Befehle und Optionen dabei sind.
+
+Fish bekommt zusätzlich dynamische Vorschläge: Task-IDs mit Titel,
+Status, Buckets (@…) und due:-Werte mit Datum. Bash, Zsh, Elvish und
+PowerShell kennen Befehle und Optionen.";
+
+/// Anleitung für `shdo completions` ohne Shell, mit Hinweis auf die eigene Shell.
+pub fn setup_guide() -> String {
+    let mut out = format!(
+        "Gibt ein Completion-Skript für die Shell aus.\n\n\
+         Aufruf: shdo completions <SHELL>\n\
+         Shells: bash, elvish, fish, powershell, zsh\n\n{SETUP_HELP}\n"
+    );
+    let own = std::env::var("SHELL")
+        .ok()
+        .and_then(|s| s.rsplit('/').next().map(str::to_string))
+        .and_then(|name| Shell::from_str(&name, true).ok());
+    if let Some(shell) = own {
+        out.push_str(&format!(
+            "\nDeine Shell laut $SHELL: {shell} → shdo completions {shell}\n"
+        ));
+    }
+    out
+}
+
 pub fn print_script(shell: Shell, cmd: &mut clap::Command) {
     let mut buf = Vec::new();
     clap_complete::generate(shell, cmd, "shdo", &mut buf);
