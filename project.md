@@ -43,8 +43,9 @@ welche Tasten es gibt. Die CLI dient der schnellen Erfassung und Skripten.
 
 ### App-Config (rechnerlokal, nicht synchronisiert)
 
-`$XDG_CONFIG_HOME/shdo/config.toml`, Fallback `~/.config/shdo/config.toml`. Fehlt die Datei,
-gelten Defaults.
+`$SHDO_CONFIG_DIR/config.toml`, sonst `$XDG_CONFIG_HOME/shdo/config.toml`, sonst
+`~/.config/shdo/config.toml`. Fehlt die Datei, gelten Defaults. `SHDO_CONFIG_DIR` lenkt nur
+shdo um (z. B. für die Demo), ohne dem Editor seine Config zu nehmen.
 
 ```toml
 dir = "~/tasks"      # Datenverzeichnis

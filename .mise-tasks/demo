@@ -3,11 +3,12 @@
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 dir="$MISE_PROJECT_ROOT/target/demo"
-# Eigene Config, damit Theme-Wechsel o. Ä. nicht in ~/.config/shdo landen
-export XDG_CONFIG_HOME="$MISE_PROJECT_ROOT/target/demo-config"
+# Eigene shdo-Config, damit Theme-Wechsel o. Ä. nicht in ~/.config/shdo landen.
+# Bewusst nicht XDG_CONFIG_HOME: das würde auch den Editor ohne seine Config starten.
+export SHDO_CONFIG_DIR="$MISE_PROJECT_ROOT/target/demo-config"
 cargo build -q
 shdo=(./target/debug/shdo --dir "$dir")
-if [[ "${1:-}" == "--reset" ]]; then rm -rf "$dir" "$XDG_CONFIG_HOME"; fi
+if [[ "${1:-}" == "--reset" ]]; then rm -rf "$dir" "$SHDO_CONFIG_DIR"; fi
 if [[ ! -d "$dir/tasks" ]]; then
   "${shdo[@]}" init >/dev/null
   printf '\n[[buckets]]\nkey = "home"\nname = "Privat"\n\n[[buckets]]\nkey = "work"\nname = "Arbeit"\n' >> "$dir/shdo.toml"

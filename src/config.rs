@@ -34,8 +34,16 @@ pub struct AppConfig {
     pub show_done: Option<bool>,
 }
 
+/// `$SHDO_CONFIG_DIR`, sonst `$XDG_CONFIG_HOME/shdo`, sonst `~/.config/shdo`.
+///
+/// `SHDO_CONFIG_DIR` lenkt nur shdo um; `XDG_CONFIG_HOME` umzubiegen würde auch den
+/// Editor (z. B. hx) ohne seine Config starten.
 pub fn config_dir() -> PathBuf {
-    match std::env::var_os("XDG_CONFIG_HOME").filter(|v| !v.is_empty()) {
+    let var = |name| std::env::var_os(name).filter(|v| !v.is_empty());
+    if let Some(dir) = var("SHDO_CONFIG_DIR") {
+        return PathBuf::from(dir);
+    }
+    match var("XDG_CONFIG_HOME") {
         Some(x) => PathBuf::from(x).join("shdo"),
         None => home().join(".config").join("shdo"),
     }
