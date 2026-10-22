@@ -207,12 +207,54 @@ fn update(path: &Path, f: impl FnOnce(&mut DocumentMut)) -> Result<()> {
     let mut doc: DocumentMut = raw
         .parse()
         .with_context(|| t!("io.invalid", path = path.display()).into_owned())?;
+    let before: Vec<String> = doc.iter().map(|(k, _)| k.to_string()).collect();
     f(&mut doc);
+    let out = place_new_keys(doc, &before);
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
-    fs::write(path, doc.to_string())
-        .with_context(|| t!("io.write", path = path.display()).into_owned())
+    fs::write(path, out).with_context(|| t!("io.write", path = path.display()).into_owned())
+}
+
+/// toml_edit puts new top-level keys at the start of the file. If the file has a
+/// commented example for such a key (`# theme = "tokyonight"`), the value replaces that
+/// line instead, so it sits next to its explanation.
+fn place_new_keys(mut doc: DocumentMut, before: &[String]) -> String {
+    let new_keys: Vec<String> = doc
+        .iter()
+        .map(|(k, _)| k.to_string())
+        .filter(|k| !before.contains(k))
+        .collect();
+    let mut replacements = vec![];
+    for key in new_keys {
+        let example = format!("# {key} =");
+        if !doc.to_string().lines().any(|l| l.starts_with(&example)) {
+            continue;
+        }
+        if let Some(item) = doc.remove(&key)
+            && let Some(v) = item.as_value()
+        {
+            replacements.push((example, format!("{key} = {}", v.to_string().trim())));
+        }
+    }
+    let mut out = doc.to_string();
+    for (example, line) in replacements {
+        let mut done = false;
+        out = out
+            .lines()
+            .map(|l| {
+                if !done && l.starts_with(&example) {
+                    done = true;
+                    line.clone()
+                } else {
+                    l.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n";
+    }
+    out
 }
 
 #[cfg(test)]
@@ -225,6 +267,30 @@ mod tests {
         let cfg = AppConfig::load(&tmp.path().join("nope.toml")).unwrap();
         assert!(cfg.dir.is_none());
         assert_eq!(cfg.data_dir(Some(Path::new("/x"))), PathBuf::from("/x"));
+    }
+
+    #[test]
+    fn new_values_replace_their_commented_example() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("config.toml");
+        set_value(&path, "theme", "nord").unwrap();
+        set_bool(&path, "show_done", false).unwrap();
+        set_value(&path, "theme", "gruvbox-dark").unwrap();
+        let raw = fs::read_to_string(&path).unwrap();
+        assert!(raw.starts_with("# shdo"), "header stays first:\n{raw}");
+        assert!(raw.contains("# Theme, also set with `t` in the board\ntheme = \"gruvbox-dark\""));
+        assert!(!raw.contains("# theme ="));
+        assert!(raw.contains("show_done = false"));
+        // a key without a commented example still works
+        set_value(&path, "custom", "x").unwrap();
+        let cfg = AppConfig::load(&path).unwrap();
+        assert_eq!(cfg.theme.as_deref(), Some("gruvbox-dark"));
+        assert_eq!(cfg.show_done, Some(false));
+        assert!(
+            fs::read_to_string(&path)
+                .unwrap()
+                .contains("custom = \"x\"")
+        );
     }
 
     #[test]
