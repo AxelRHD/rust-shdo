@@ -116,6 +116,17 @@ fn short(d: Date, today: Date) -> String {
     }
 }
 
+/// Wochentag und volles Datum, z. B. „fr 23.10.2026“.
+pub fn fmt_long(d: Date) -> String {
+    format!(
+        "{} {:02}.{:02}.{}",
+        weekday_abbr(d),
+        d.day(),
+        d.month(),
+        d.year()
+    )
+}
+
 /// Kurzform für Fälligkeiten: `heute`, `morgen`, `gestern`, `fr 24.10.`, `24.10.`.
 pub fn fmt_due(due: Date, today: Date) -> String {
     match days_between(today, due) {

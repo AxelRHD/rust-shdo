@@ -1,4 +1,5 @@
 mod board;
+mod completion;
 mod config;
 mod dates;
 mod git;
@@ -13,7 +14,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 
 use board::{Board, Filter};
 use config::AppConfig;
@@ -23,6 +24,7 @@ use store::Store;
 #[command(
     name = "shdo",
     version,
+    disable_help_subcommand = true,
     about = "Kanban-Board fürs Terminal – Tasks als Markdown-Dateien in einem Git-Repo",
     after_help = "Ohne Argumente öffnet sich das Board.\n\
                   Neuer Task: shdo Rechnung bezahlen P1 due:fr\n\
@@ -69,13 +71,28 @@ enum Cmd {
     Archive,
     /// Datenverzeichnis anlegen (inkl. git init)
     Init,
+    /// Completion-Skript ausgeben, z. B. `shdo completions fish > ~/.config/fish/completions/shdo.fish`
+    Completions { shell: clap_complete::Shell },
+    /// Intern: dynamische Vorschläge für die Completion
+    #[command(name = "__complete", hide = true)]
+    Complete { kind: completion::Kind },
     /// Alles andere: `shdo Rechnung bezahlen P1 due:fr`
     #[command(external_subcommand)]
     Text(Vec<String>),
 }
 
 const SUBCOMMANDS: &[&str] = &[
-    "add", "ls", "done", "mv", "rm", "edit", "sync", "archive", "init", "bucket",
+    "add",
+    "ls",
+    "done",
+    "mv",
+    "rm",
+    "edit",
+    "sync",
+    "archive",
+    "init",
+    "bucket",
+    "completions",
 ];
 
 fn main() {
@@ -99,8 +116,20 @@ fn run() -> Result<()> {
         store.ensure_initialized()?;
         return tui::run(store, cfg, cfg_path);
     };
-    if let Cmd::Text(words) = &cmd {
-        guard_typo(words)?;
+    match &cmd {
+        Cmd::Text(words) => guard_typo(words)?,
+        Cmd::Completions { shell } => {
+            completion::print_script(*shell, &mut Cli::command());
+            return Ok(());
+        }
+        // Completion soll nie mit Fehlern stören
+        Cmd::Complete { kind } => {
+            for line in completion::candidates(&store, *kind).unwrap_or_default() {
+                println!("{line}");
+            }
+            return Ok(());
+        }
+        _ => {}
     }
     if !matches!(cmd, Cmd::Init) {
         store.ensure_initialized()?;
@@ -178,6 +207,8 @@ fn run() -> Result<()> {
             Ok(())
         }
         Cmd::Init => init(&store),
+        // bereits vor der Initialisierungsprüfung behandelt
+        Cmd::Completions { .. } | Cmd::Complete { .. } => Ok(()),
     }
 }
 
@@ -366,7 +397,6 @@ pub fn open_editor(editor: &str, path: &std::path::Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::CommandFactory;
 
     #[test]
     fn typo_guard() {

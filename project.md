@@ -195,6 +195,7 @@ shdo edit <id>                    Task-Datei im Editor öffnen
 shdo sync                         Mit dem Git-Remote synchronisieren
 shdo archive                      Tasks der letzten Spalte nach archive/
 shdo init                         Struktur anlegen (inkl. git init)
+shdo completions <shell>          Completion-Skript ausgeben
 Global: --dir <pfad>
 ```
 
@@ -217,6 +218,19 @@ Global: --dir <pfad>
 - `heute`, `morgen`, `übermorgen`
 - Wochentage `mo`–`so` → nächstes Vorkommen (nicht heute)
 - Ungültige Eingaben ergeben eine klare Fehlermeldung
+
+### Shell-Completion
+
+- `shdo completions <shell>` (fish, bash, zsh, elvish, powershell) gibt das Skript aus;
+  `mise run install` richtet die Fish-Completion automatisch ein
+- Statisch für alle Shells (Befehle, Optionen) über `clap_complete`
+- Fish zusätzlich dynamisch über den versteckten Befehl `shdo __complete <art>`:
+  - IDs mit Titel und Status als Beschreibung bei `done`/`mv`/`rm`/`edit`/`bucket`
+  - Status bei `mv <id> …`, Buckets (und `-`) bei `bucket <id> …`
+  - `@bucket` bei `ls` und überall, wo das Wort mit `@` beginnt
+  - `due:…`-Kurzformen mit aufgelöstem Datum (`due:fr  fr 23.10.2026`)
+  - beachtet `--dir` auf der Kommandozeile; Fehler erzeugen nie Ausgabe
+- Nie Dateinamen vorschlagen, außer Verzeichnisse für `--dir`
 
 ### `shdo ls`
 
@@ -377,7 +391,7 @@ mise-Tasks in `.mise-tasks/`:
 | `check:fmt`    | Formatierung prüfen                                    |
 | `check:clippy` | Clippy mit `-D warnings`                               |
 | `check:all`    | fmt + clippy + Tests                                   |
-| `install`      | `cargo install --path .`                               |
+| `install`      | `cargo install --path .` + Fish-Completion             |
 
 Tests arbeiten in temporären Verzeichnissen, nie in `~/tasks`; Datumstests mit fester Referenzzeit.
 
@@ -387,9 +401,6 @@ Tests arbeiten in temporären Verzeichnissen, nie in `~/tasks`; Datumstests mit 
   Fälligkeiten markiert, „Demnächst“-Liste; `Tab` fokussiert, Filter auf Tag/KW; Feiertage
   als Tabelle je Bundesland, später `holidays = "by"` konfigurierbar) – Details offen
 
-- Shell-Completion (Fish zuerst, per `clap_complete`): `shdo completions fish` gibt das
-  Skript aus; dynamisch ergänzt werden IDs (mit Titel als Beschreibung) bei
-  `done`/`mv`/`rm`/`edit` und Status bei `mv`
 - Auto-Sync beim Start/Beenden der TUI (optional, per Config)
 - Weitere eingebaute Themes (Nord, Catppuccin Mocha/Latte, Gruvbox)
 - Eigene Themes in der TUI anlegen/löschen – löschbar nur selbst angelegte, nie eingebaute

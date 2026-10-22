@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
-#MISE description="Release bauen und nach ~/.cargo/bin installieren"
+#MISE description="Release bauen, nach ~/.cargo/bin installieren und Fish-Completion einrichten"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 echo "🏗️  Installiere shdo …"
 cargo install --path . --locked -q
 echo "✅ $(command -v shdo)"
+if command -v fish >/dev/null; then
+  dir="${XDG_CONFIG_HOME:-$HOME/.config}/fish/completions"
+  mkdir -p "$dir"
+  shdo completions fish > "$dir/shdo.fish"
+  echo "✅ Fish-Completion: $dir/shdo.fish"
+fi
