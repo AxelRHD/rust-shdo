@@ -1,8 +1,11 @@
-# shdo
+<p align="center">
+  <img src="logo.svg" alt="shdo logo" width="424">
+</p>
 
-[![CI](https://github.com/AxelRHD/rust-shdo/actions/workflows/ci.yml/badge.svg)](https://github.com/AxelRHD/rust-shdo/actions/workflows/ci.yml)
-
-**A kanban board for your terminal. Every task is a Markdown file in a git repository.**
+<p align="center">
+  <strong>A kanban board for your terminal. Every task is a Markdown file in a git repository.</strong><br>
+  <a href="https://github.com/AxelRHD/rust-shdo/actions/workflows/ci.yml"><img src="https://github.com/AxelRHD/rust-shdo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
 
 shdo opens straight into a board, shows every available key at the bottom of the
 screen and syncs between machines with plain git. No server, no database, no account –

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 212 64" width="424" height="128">
+  <!-- Dark plate so the logo reads on light and dark backgrounds (Nord palette) -->
+  <rect x="0" y="0" width="212" height="64" rx="12" fill="#2e3440"/>
+
+  <!-- Terminal window -->
+  <rect x="12" y="9" width="76" height="46" rx="5" fill="#3b4252" stroke="#4c566a" stroke-width="1.5"/>
+  <circle cx="19" cy="15.5" r="2" fill="#bf616a"/>
+  <circle cx="26" cy="15.5" r="2" fill="#ebcb8b"/>
+  <circle cx="33" cy="15.5" r="2" fill="#a3be8c"/>
+
+  <!-- Kanban columns: todo, doing, done -->
+  <g stroke-linecap="round">
+    <line x1="18" y1="24" x2="34" y2="24" stroke="#81a1c1" stroke-width="1.6"/>
+    <line x1="42" y1="24" x2="58" y2="24" stroke="#88c0d0" stroke-width="1.6"/>
+    <line x1="66" y1="24" x2="82" y2="24" stroke="#81a1c1" stroke-width="1.6"/>
+  </g>
+
+  <!-- Cards -->
+  <rect x="18" y="28" width="16" height="8" rx="1.5" fill="#434c5e" stroke="#bf616a" stroke-width="1"/>
+  <rect x="18" y="39" width="16" height="8" rx="1.5" fill="#434c5e" stroke="#4c566a" stroke-width="1"/>
+  <rect x="42" y="28" width="16" height="8" rx="1.5" fill="#434c5e" stroke="#88c0d0" stroke-width="1.4"/>
+  <rect x="66" y="28" width="16" height="8" rx="1.5" fill="#434c5e" stroke="#4c566a" stroke-width="1"/>
+
+  <!-- Card content lines -->
+  <g stroke="#d8dee9" stroke-width="1" stroke-linecap="round">
+    <line x1="21" y1="32" x2="30" y2="32"/>
+    <line x1="21" y1="43" x2="28" y2="43"/>
+    <line x1="45" y1="32" x2="54" y2="32"/>
+  </g>
+
+  <!-- Done: check mark -->
+  <path d="M70 32 L73 34.5 L78 29.5" stroke="#a3be8c" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Text -->
+  <!-- Two text elements instead of tspans: renders the same in every SVG viewer -->
+  <text x="102" y="43" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="30" font-weight="700" fill="#88c0d0">sh</text>
+  <text x="138" y="43" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="30" font-weight="700" fill="#eceff4">do</text>
+  <text x="104" y="54" font-family="system-ui, -apple-system, sans-serif" font-size="7.5" fill="#7b88a1" letter-spacing="0.4">kanban for your terminal</text>
+</svg>
