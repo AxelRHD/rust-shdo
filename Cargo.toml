@@ -9,7 +9,7 @@ repository = "https://github.com/AxelRHD/rust-shdo"
 readme = "README.md"
 keywords = ["todo", "kanban", "tui", "git", "tasks"]
 categories = ["command-line-utilities"]
-exclude = ["/target", "/.mise-tasks", "/project.md", "/.github", "/logo.svg", "/docs"]
+exclude = ["/target", "/.mise-tasks", "/.github", "/logo.svg", "/docs"]
 
 [dependencies]
 anyhow = "1.0.104"

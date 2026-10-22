@@ -17,3 +17,7 @@ install-path = "CARGO_HOME"
 hosting = "github"
 # Whether to install an updater program
 install-updater = false
+# Publish to crates.io after the GitHub release (.github/workflows/publish-crates.yml)
+publish-jobs = ["./publish-crates"]
+# Trusted publishing needs an OIDC token in that job
+github-custom-job-permissions = { "publish-crates" = { id-token = "write", contents = "read" } }
