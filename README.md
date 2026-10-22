@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.svg" alt="shdo logo" width="424">
+  <img src="https://raw.githubusercontent.com/AxelRHD/rust-shdo/main/logo.svg" alt="shdo logo" width="424">
 </p>
 
 <p align="center">
@@ -11,30 +11,9 @@ shdo opens straight into a board, shows every available key at the bottom of the
 screen and syncs between machines with plain git. No server, no database, no account –
 just files you can read, edit and diff.
 
-```
- shdo ~/.local/share/shdo                                                                                  [ 8 open ]
-┌Calendar─────────────────┐┌Todo────────────────────────┐┌Doing────────────────────────┐┌Waiting─────────────────────┐
-│      October 2026       ││→ P1 Pay electricity bill   ││  P2 Review pull request     ││  P2 Reply from landlord    │
-│ Wk Su Mo Tu We Th Fr Sa ││     tomorrow · @home       ││     today · @work           ││     since today · @home    │
-│ 40             1  2  3  ││  P1 Quarterly report       ││  P2 Prepare workshop        ││                            │
-│ 41  4  5  6  7  8  9 10 ││     MON 10/26 · ☐ 1/3      ││     WED 10/28 · @work       ││                            │
-│ 42 11 12 13 14 15 16 17 ││  P2 Book flights           ││                             ││                            │
-│ 43 18 19 20 21 22¹23²24 ││     tomorrow · @home       ││                             ││                            │
-│ 44 25 26¹27 28¹29 30 31 ││  P2 Renew passport         ││                             ││                            │
-│                         ││     11/22 · @home          ││                             ││                            │
-│      November 2026      ││  P3 Fix bike light         ││                             ││                            │
-│ Wk Su Mo Tu We Th Fr Sa ││     @home                  ││                             ││                            │
-│ 45  1  2  3  4  5  6  7 ││                            ││                             ││                            │
-│ 46  8  9 10 11 12 13 14 ││                            ││                             ││                            │
-│ 47 15 16 17 18 19 20 21 ││                            ││                             ││                            │
-│ 48 22¹23 24 25 26 27 28 ││                            ││                             ││                            │
-│ 49 29 30                ││                            ││                             ││                            │
-│                         ││                            ││                             ││                            │
-└─────────────────────────┘└──────────────────────1 of 5┘└────────────────────────────2┘└─────────────────────────1 ▸┘
-
- [h/l → column] [j/k → card] [H/L → move] [n → new] [e → edit] [E → editor] [x → done] [⏎ → details] [f → filter]
- [b → bucket] [v → done on/off] [c → calendar] [s → sync] [t → theme] [? → help] [q → quit]
-```
+<p align="center">
+  <img src="https://raw.githubusercontent.com/AxelRHD/rust-shdo/main/docs/demo.gif" alt="shdo demo: quick capture, moving a card, the task form, the bucket filter and the theme picker" width="900">
+</p>
 
 ## Why shdo?
 

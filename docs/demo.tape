@@ -42,7 +42,7 @@ Sleep 800ms
 # New task in the form, with the date recognized live
 Type "n"
 Sleep 800ms
-Type "Plan sprint due:mon"
+Type "Plan sprint due:mon @work"
 Sleep 1.2s
 Tab
 Sleep 400ms
