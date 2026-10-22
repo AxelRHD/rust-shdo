@@ -1,0 +1,19 @@
+# Nord – https://www.nordtheme.com
+name = "Nord"
+
+[colors]
+bg = "#2e3440"            # nord0
+fg = "#d8dee9"            # nord4
+dim = "#616e88"           # Kommentarfarbe aus nord-vim
+border = "#4c566a"        # nord3
+border_active = "#88c0d0" # nord8
+title = "#81a1c1"         # nord9
+accent = "#8fbcbb"        # nord7
+selection = "#434c5e"     # nord2
+prio_high = "#bf616a"     # nord11
+prio_low = "#616e88"
+overdue = "#bf616a"       # nord11
+today = "#ebcb8b"         # nord13
+done = "#a3be8c"          # nord14
+key = "#b48ead"           # nord15
+warn = "#d08770"          # nord12

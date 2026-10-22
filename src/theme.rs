@@ -12,6 +12,7 @@ pub const DEFAULT_THEME: &str = "tokyonight";
 
 const BUILTIN: &[(&str, &str)] = &[
     ("tokyonight", include_str!("../themes/tokyonight.toml")),
+    ("nord", include_str!("../themes/nord.toml")),
     ("terminal", include_str!("../themes/terminal.toml")),
 ];
 
@@ -157,7 +158,9 @@ mod tests {
         assert!(warnings.is_empty());
         assert_eq!(themes[0].id, DEFAULT_THEME);
         assert_eq!(themes[0].c.bg, Color::Rgb(0x1a, 0x1b, 0x26));
-        assert_eq!(themes[1].c.bg, Color::Reset);
+        assert_eq!(themes[1].id, "nord");
+        assert_eq!(themes[1].c.bg, Color::Rgb(0x2e, 0x34, 0x40));
+        assert_eq!(themes[2].c.bg, Color::Reset);
     }
 
     #[test]

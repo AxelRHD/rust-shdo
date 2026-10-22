@@ -347,7 +347,7 @@ Global: --dir <pfad>
 - Semantische Farb-Tokens: `bg`, `fg`, `dim`, `border`, `border_active`, `title`, `accent`,
   `selection`, `prio_high`, `prio_low`, `overdue`, `today`, `done`, `key`, `warn`
 - Farben als `#rrggbb` oder ANSI-Namen (`red`, `darkgray`, `reset`, …)
-- Eingebaut (`themes/*.toml`, per `include_str!` im Binary): `tokyonight` (Default), `terminal`
+- Eingebaut (`themes/*.toml`, per `include_str!` im Binary): `tokyonight` (Default), `nord`, `terminal`
   (ANSI-Farben und Hintergrund des Terminals)
 - Eigene Themes: `~/.config/shdo/themes/<id>.toml`, gleiches Format; fehlende Tokens kommen
   vom Default-Theme; gleiche ID überschreibt ein eingebautes; Fehler werden Warnungen
@@ -402,7 +402,7 @@ Tests arbeiten in temporären Verzeichnissen, nie in `~/tasks`; Datumstests mit 
   als Tabelle je Bundesland, später `holidays = "by"` konfigurierbar) – Details offen
 
 - Auto-Sync beim Start/Beenden der TUI (optional, per Config)
-- Weitere eingebaute Themes (Nord, Catppuccin Mocha/Latte, Gruvbox)
+- Weitere eingebaute Themes (Catppuccin Mocha/Latte, Gruvbox)
 - Eigene Themes in der TUI anlegen/löschen – löschbar nur selbst angelegte, nie eingebaute
 - Suche/Filter mit `/`
 - Zurückstellen (`wait = <datum>`: erst ab Datum anzeigen)
