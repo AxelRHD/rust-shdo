@@ -343,6 +343,11 @@ fn draw(f: &mut ratatui::Frame, s: &Setup, c: &Palette, cfg_path: &std::path::Pa
         .min(area.width.saturating_sub(2))
         .saturating_sub(4)
         .max(1);
+    // The cursor row counts wrapped lines above the input field, not just list entries
+    let cursor = cursor.map(|(line, col)| {
+        let above = Paragraph::new(lines[..line].to_vec()).wrap(Wrap { trim: false });
+        (above.line_count(text_width), col)
+    });
     let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
     let rows = paragraph.line_count(text_width) as u16;
     let inner = popup(f, c, &title, 64, rows + 2);
