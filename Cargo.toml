@@ -2,6 +2,12 @@
 name = "shdo"
 version = "0.1.0"
 edition = "2024"
+description = "A kanban board for the terminal: tasks are Markdown files in a git repository"
+license = "MIT"
+readme = "README.md"
+keywords = ["todo", "kanban", "tui", "git", "tasks"]
+categories = ["command-line-utilities"]
+exclude = ["/target", "/.mise-tasks"]
 
 [dependencies]
 anyhow = "1.0.104"
