@@ -46,16 +46,27 @@ just files you can read, edit and diff.
 
 ## Installation
 
-shdo needs Rust 1.89 or newer and `git`. Until the first release on
-crates.io, install it from source:
+shdo runs on Linux and macOS and needs `git`.
+
+**Prebuilt binary** (Linux and macOS, x86_64 and ARM):
+
+```sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/AxelRHD/rust-shdo/releases/latest/download/shdo-installer.sh | sh
+```
+
+**With Cargo** (Rust 1.89 or newer):
+
+```sh
+cargo install shdo
+```
+
+**From source:**
 
 ```sh
 git clone https://github.com/AxelRHD/rust-shdo
 cd rust-shdo
 cargo install --path .
 ```
-
-After the release this becomes `cargo install shdo`.
 
 ## Getting started
 
