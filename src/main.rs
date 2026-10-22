@@ -32,7 +32,7 @@ use store::Store;
                   Beginnt der Titel mit einem Befehl: shdo -- ls reparieren"
 )]
 struct Cli {
-    /// Datenverzeichnis (statt `dir` aus der Config bzw. ~/tasks)
+    /// Data directory (instead of `dir` from the config or ~/tasks)
     #[arg(long, global = true, value_name = "PFAD")]
     dir: Option<PathBuf>,
 
@@ -42,46 +42,46 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Neuen Task anlegen (wie `shdo <text>`)
+    /// Create a new task (same as `shdo <text>`)
     #[command(visible_alias = "a")]
     Add {
         #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
         text: Vec<String>,
     },
-    /// Board als Text ausgeben (beachtet den Bucket-Filter der TUI)
+    /// Print the board as text (honours the TUI's bucket filter)
     Ls {
-        /// Alle Buckets anzeigen
+        /// Show all buckets
         #[arg(short, long)]
         all: bool,
-        /// Nur diesen Bucket anzeigen (z. B. @work)
+        /// Show only this bucket (e.g. @work)
         bucket: Option<String>,
     },
-    /// Bucket eines Tasks setzen („-“ entfernt ihn)
+    /// Set a task's bucket ("-" removes it)
     Bucket { id: String, bucket: String },
-    /// Task als erledigt markieren (letzter Status)
+    /// Mark a task as done (last status)
     Done { id: String },
-    /// Status eines Tasks setzen (key oder Name, Präfix reicht)
+    /// Set a task's status (key or name, a prefix is enough)
     Mv { id: String, status: String },
-    /// Task löschen
+    /// Delete a task
     Rm { id: String },
-    /// Task-Datei im Editor öffnen
+    /// Open the task file in the editor
     Edit { id: String },
-    /// Mit dem Git-Remote synchronisieren
+    /// Sync with the git remote
     Sync,
-    /// Erledigte Tasks nach archive/ verschieben
+    /// Move done tasks to archive/
     Archive,
-    /// Datenverzeichnis anlegen (inkl. git init)
+    /// Set up the data directory (including git init)
     Init,
-    /// Completion-Skript für die Shell ausgeben (ohne Argument: Anleitung)
+    /// Print a shell completion script (without argument: setup guide)
     #[command(after_help = completion::SETUP_HELP)]
     Completions {
-        /// Shell, für die das Skript erzeugt wird
+        /// Shell to generate the script for
         shell: Option<clap_complete::Shell>,
     },
-    /// Intern: dynamische Vorschläge für die Completion
+    /// Internal: dynamic suggestions for shell completion
     #[command(name = "__complete", hide = true)]
     Complete { kind: completion::Kind },
-    /// Alles andere: `shdo Rechnung bezahlen P1 due:fr`
+    /// Anything else: `shdo Pay invoice P1 due:fr`
     #[command(external_subcommand)]
     Text(Vec<String>),
 }
@@ -131,7 +131,7 @@ fn run() -> Result<()> {
             print!("{}", completion::setup_guide());
             return Ok(());
         }
-        // Completion soll nie mit Fehlern stören
+        // Completion must never show errors
         Cmd::Complete { kind } => {
             for line in completion::candidates(&store, *kind).unwrap_or_default() {
                 println!("{line}");
@@ -216,12 +216,12 @@ fn run() -> Result<()> {
             Ok(())
         }
         Cmd::Init => init(&store),
-        // bereits vor der Initialisierungsprüfung behandelt
+        // already handled before the initialization check
         Cmd::Completions { .. } | Cmd::Complete { .. } => Ok(()),
     }
 }
 
-/// `shdo -- ls reparieren` wird zu `shdo add ls reparieren`.
+/// `shdo -- ls fix` becomes `shdo add ls fix`.
 fn rewrite_dashdash(mut args: Vec<String>) -> Vec<String> {
     let mut i = 1;
     while i < args.len() {
@@ -238,7 +238,7 @@ fn rewrite_dashdash(mut args: Vec<String>) -> Vec<String> {
     args
 }
 
-/// `shdo sycn` soll keinen Task „sycn“ anlegen.
+/// `shdo sycn` must not create a task "sycn".
 fn guard_typo(text: &[String]) -> Result<()> {
     let [word] = text else { return Ok(()) };
     let w = word.to_lowercase();
@@ -252,7 +252,7 @@ fn guard_typo(text: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// Editierdistanz mit Vertauschung benachbarter Zeichen (Optimal String Alignment).
+/// Edit distance counting adjacent transpositions (optimal string alignment).
 fn osa_distance(a: &str, b: &str) -> usize {
     let a: Vec<char> = a.chars().collect();
     let b: Vec<char> = b.chars().collect();
@@ -328,7 +328,7 @@ fn ls(store: &Store, filter: &Filter) -> Result<()> {
         );
         println!();
     }
-    // Bucket pro Zeile nur zeigen, wenn mehr als einer sichtbar sein kann
+    // Show the bucket per line only if more than one can be visible
     let show_bucket = !board.buckets.is_empty() && board.filter.inherited().is_none();
     for (ci, col) in board.columns.iter().enumerate() {
         if ci > 0 {

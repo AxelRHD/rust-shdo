@@ -1,4 +1,4 @@
-//! Rechnerlokale App-Konfiguration: `~/.config/shdo/config.toml`.
+//! Per-machine app configuration: `~/.config/shdo/config.toml`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -42,10 +42,10 @@ pub struct AppConfig {
     pub holidays: Option<String>,
 }
 
-/// `$SHDO_CONFIG_DIR`, sonst `$XDG_CONFIG_HOME/shdo`, sonst `~/.config/shdo`.
+/// `$SHDO_CONFIG_DIR`, else `$XDG_CONFIG_HOME/shdo`, else `~/.config/shdo`.
 ///
-/// `SHDO_CONFIG_DIR` lenkt nur shdo um; `XDG_CONFIG_HOME` umzubiegen würde auch den
-/// Editor (z. B. hx) ohne seine Config starten.
+/// `SHDO_CONFIG_DIR` only redirects shdo; overriding `XDG_CONFIG_HOME` would also start
+/// the editor (e.g. hx) without its config.
 pub fn config_dir() -> PathBuf {
     let var = |name| std::env::var_os(name).filter(|v| !v.is_empty());
     if let Some(dir) = var("SHDO_CONFIG_DIR") {
@@ -84,7 +84,7 @@ impl AppConfig {
         }
     }
 
-    /// Reihenfolge: `--dir`, dann `dir` aus der Config, dann `~/tasks`.
+    /// Order: `--dir`, then `dir` from the config, then `~/tasks`.
     pub fn data_dir(&self, cli: Option<&Path>) -> PathBuf {
         match (cli, &self.dir) {
             (Some(p), _) => p.to_path_buf(),
@@ -103,7 +103,7 @@ impl AppConfig {
     }
 }
 
-/// Setzt einen String-Wert in der Config-Datei; Kommentare und andere Werte bleiben erhalten.
+/// Sets a string value in the config file; comments and other values are preserved.
 pub fn set_value(path: &Path, key: &str, val: &str) -> Result<()> {
     update(path, |doc| doc[key] = value(val))
 }

@@ -1,4 +1,4 @@
-//! Synchronisation über das `git`-Binary.
+//! Syncing via the `git` binary.
 
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -7,7 +7,7 @@ use anyhow::{Context, Result, bail};
 
 pub struct Git<'a> {
     dir: &'a Path,
-    /// Ohne Terminal (TUI): keine Passwort-/Passphrase-Abfragen, sonst hängt alles.
+    /// Without a terminal (TUI): no password/passphrase prompts, otherwise everything hangs.
     batch: bool,
 }
 
@@ -28,7 +28,7 @@ impl<'a> Git<'a> {
         cmd
     }
 
-    /// Führt git aus und liefert stdout; bei Fehler die komplette Ausgabe.
+    /// Runs git and returns stdout; on failure the full output.
     pub fn run(&self, args: &[&str]) -> Result<String> {
         let out = self
             .command(args)
@@ -55,7 +55,7 @@ impl<'a> Git<'a> {
         self.run(&["init", "-q"]).map(|_| ())
     }
 
-    /// add, commit (falls nötig), pull --rebase, push. Liefert eine Zusammenfassung.
+    /// add, commit (if needed), pull --rebase, push. Returns a summary.
     pub fn sync(&self) -> Result<String> {
         if !self.is_repo() {
             bail!(
@@ -148,7 +148,7 @@ mod tests {
         let r = ga.sync().unwrap();
         assert!(r.contains("gepusht nach origin"), "{r}");
 
-        // Zweiter Rechner klont, ändert, synct; erster holt die Änderung.
+        // A second machine clones, changes and syncs; the first one picks it up.
         let b = tmp.path().join("b");
         Git::new(tmp.path(), true)
             .run(&["clone", "-q", remote.to_str().unwrap(), b.to_str().unwrap()])

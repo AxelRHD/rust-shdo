@@ -1,4 +1,4 @@
-//! Event-Loop, Terminal-Setup und -Teardown.
+//! Event loop, terminal setup and teardown.
 
 mod app;
 mod calendar;
@@ -25,7 +25,7 @@ const TICK: Duration = Duration::from_millis(500);
 
 pub fn run(store: Store, cfg: AppConfig, cfg_path: PathBuf) -> Result<()> {
     let mut app = App::new(store, cfg, cfg_path)?;
-    // ratatui::init installiert auch einen Panic-Hook, der das Terminal zurücksetzt.
+    // ratatui::init also installs a panic hook that restores the terminal.
     let mut terminal = ratatui::init();
     let res = event_loop(&mut terminal, &mut app);
     ratatui::restore();
@@ -50,7 +50,7 @@ fn event_loop(terminal: &mut DefaultTerminal, app: &mut App) -> Result<()> {
     Ok(())
 }
 
-/// Verlässt die TUI für ein externes Programm und stellt sie danach wieder her.
+/// Leaves the TUI for an external program and restores it afterwards.
 fn with_suspended<T>(terminal: &mut DefaultTerminal, f: impl FnOnce() -> T) -> T {
     let _ = execute!(stdout(), LeaveAlternateScreen);
     let _ = disable_raw_mode();

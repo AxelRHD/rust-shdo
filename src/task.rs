@@ -1,7 +1,7 @@
-//! Task-Modell: Markdown-Datei mit TOML-Frontmatter zwischen `+++`-Zeilen.
+//! Task model: a Markdown file with TOML frontmatter between `+++` lines.
 //!
-//! Das Frontmatter wird mit `toml_edit` gehalten, damit Kommentare, Formatierung
-//! und unbekannte Felder beim Schreiben erhalten bleiben. Der Body bleibt unverändert.
+//! The frontmatter is kept as a `toml_edit` document so comments, formatting
+//! and unknown fields survive writes. The body is kept as is.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -22,7 +22,7 @@ pub struct Task {
     doc: DocumentMut,
     pub body: String,
     pub title: String,
-    /// Status-Key; leer, falls im Frontmatter nicht gesetzt.
+    /// Status key; empty if not set in the frontmatter.
     pub status: String,
     pub bucket: Option<String>,
     pub prio: Option<u8>,
@@ -30,7 +30,7 @@ pub struct Task {
     pub created: Option<Timestamp>,
     pub moved: Option<Timestamp>,
     pub done: Option<Timestamp>,
-    /// Änderungszeit der Datei, Ersatz für ein fehlendes `done`.
+    /// File modification time, used when `done` is missing.
     pub mtime: Option<Timestamp>,
 }
 
@@ -85,7 +85,7 @@ impl Task {
             .filter(|t| !t.is_empty())
             .ok_or_else(|| anyhow!("Feld „title“ fehlt"))?
             .to_string();
-        // `column` ist der frühere Name des Felds und wird weiter gelesen.
+        // `column` is the field's former name and is still accepted.
         let status = doc
             .get("status")
             .or_else(|| doc.get(LEGACY_STATUS))
@@ -127,7 +127,7 @@ impl Task {
     }
 
     pub fn save(&self) -> Result<()> {
-        // Erst in eine temporäre Datei schreiben, dann umbenennen: nie halbe Dateien.
+        // Write to a temporary file first, then rename: never a half-written file.
         let tmp = self.path.with_extension("md.tmp");
         fs::write(&tmp, self.render())
             .with_context(|| format!("{} nicht schreibbar", tmp.display()))?;
@@ -150,7 +150,7 @@ impl Task {
         self.bucket = bucket.map(String::from);
     }
 
-    /// Einzeilige Notiz setzen (Formular). Mehrzeilige Notizen nur über den Editor.
+    /// Sets a single-line note (form). Multi-line notes only via the editor.
     pub fn set_note(&mut self, note: &str) {
         let note = note.trim();
         self.body = if note.is_empty() {
@@ -160,7 +160,7 @@ impl Task {
         };
     }
 
-    /// Lässt sich die Notiz im einzeiligen Formularfeld bearbeiten?
+    /// Can the note be edited in the single-line form field?
     pub fn note_is_single_line(&self) -> bool {
         !self.note().contains('\n')
     }
@@ -194,7 +194,7 @@ impl Task {
         self.due = due;
     }
 
-    /// Setzt einen neuen Status und pflegt `moved` und `done`.
+    /// Sets a new status and maintains `moved` and `done`.
     pub fn move_to(&mut self, status: &str, is_done: bool, now: &Zoned) {
         if self.status == status {
             return;
@@ -213,7 +213,7 @@ impl Task {
         }
     }
 
-    /// (erledigt, gesamt) der Markdown-Checkboxen im Body.
+    /// (checked, total) Markdown checkboxes in the body.
     pub fn checklist(&self) -> Option<(usize, usize)> {
         let mut done = 0;
         let mut total = 0;
@@ -243,7 +243,7 @@ fn datetime_item(now: &Zoned) -> Item {
     value(dt)
 }
 
-/// Akzeptiert TOML-Datumswerte und, für Handeditiertes, auch Strings.
+/// Accepts TOML date values and, for hand-edited files, strings too.
 fn raw_datetime(doc: &DocumentMut, key: &str) -> Option<String> {
     let v = doc.get(key)?;
     v.as_datetime()
@@ -269,7 +269,7 @@ fn get_timestamp(doc: &DocumentMut, key: &str) -> Result<Option<Timestamp>> {
     if let Ok(ts) = s.parse::<Timestamp>() {
         return Ok(Some(ts));
     }
-    // Ohne Offset (lokale Zeit) oder nur Datum: in der Systemzeitzone interpretieren.
+    // No offset (local time) or date only: interpret in the system time zone.
     let tz = jiff::tz::TimeZone::system();
     if let Ok(dt) = s.parse::<jiff::civil::DateTime>() {
         return Ok(dt.to_zoned(tz).ok().map(|z| z.timestamp()));

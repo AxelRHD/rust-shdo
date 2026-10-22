@@ -1,4 +1,4 @@
-//! Eingabefelder und das Formular für neue bzw. bearbeitete Tasks.
+//! Input fields and the form for new or edited tasks.
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -8,7 +8,7 @@ use crate::task::{PRIO_DEFAULT, Task};
 #[derive(Default, Clone)]
 pub struct Input {
     pub text: String,
-    /// Cursor-Position in Zeichen (nicht Bytes).
+    /// Cursor position in characters (not bytes).
     pub cursor: usize,
 }
 
@@ -86,7 +86,7 @@ impl Field {
 pub const PRIO_NAMES: [&str; 3] = ["hoch", "normal", "niedrig"];
 
 pub struct Form {
-    /// `None` = neuer Task, sonst ID des bearbeiteten Tasks.
+    /// `None` = new task, otherwise the ID of the edited task.
     pub editing: Option<String>,
     pub fields: Vec<Field>,
     pub focus: usize,
@@ -95,14 +95,14 @@ pub struct Form {
     pub status_names: Vec<String>,
     pub prio: u8,
     pub due: Input,
-    /// 0 = ohne Bucket, sonst Index + 1 in `bucket_names`.
+    /// 0 = no bucket, otherwise index + 1 into `bucket_names`.
     pub bucket: usize,
     pub bucket_names: Vec<String>,
     pub bucket_keys: Vec<String>,
-    /// Bucket wurde aus dem Filter übernommen und noch nicht angefasst.
+    /// The bucket was taken over from the filter and not touched yet.
     pub inherited: bool,
     pub note: Input,
-    /// Mehrzeilige Notizen lassen sich nur im Editor bearbeiten.
+    /// Multi-line notes can only be edited in the editor.
     pub note_editable: bool,
 }
 
@@ -207,7 +207,7 @@ impl Form {
         }
     }
 
-    /// Verarbeitet alles außer Enter/Esc.
+    /// Handles everything except Enter/Esc.
     pub fn handle(&mut self, key: KeyEvent) {
         let n = self.fields.len();
         match key.code {

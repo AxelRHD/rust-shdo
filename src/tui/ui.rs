@@ -112,7 +112,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     .areas(area);
 
     draw_header(f, app, &c, header);
-    // Kalender links, solange daneben noch zwei Board-Spalten Platz haben
+    // Calendar on the left as long as two board columns still fit next to it
     let min_board = MIN_COLUMN_WIDTH * 2.min(app.visible_columns() as u16);
     let body = if app.show_calendar && body.width >= calendar::WIDTH + min_board {
         let [cal, rest] =
@@ -362,7 +362,7 @@ fn card_lines<'a>(t: &'a Task, c: &Palette, selected: bool, ctx: &CardCtx) -> Ve
         Span::styled(truncate(&t.title, title_width), title_style),
     ]);
 
-    // Teile mit Priorität: passt die Zeile nicht, fallen die unwichtigsten zuerst weg.
+    // Parts with priority: if the line does not fit, the least important go first.
     let mut parts: Vec<(u8, Span)> = vec![];
     if last {
         if let Some(ts) = t.done.or(t.mtime) {
@@ -487,7 +487,7 @@ fn draw_status(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
     f.render_widget(Paragraph::new(line), area);
 }
 
-/// Tastenleiste; bricht auf zwei Zeilen um, wenn eine nicht reicht.
+/// Key bar; wraps onto a second line if one is not enough.
 fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
     let has_buckets = !app.board.buckets.is_empty();
     let keys: Vec<(&str, &str)> = match &app.mode {
@@ -758,7 +758,7 @@ fn draw_confirm(f: &mut Frame, app: &App, c: &Palette) {
     f.render_widget(Paragraph::new(lines), inner);
 }
 
-/// Sichtbarer Ausschnitt eines Eingabefelds und Cursor-Spalte darin.
+/// Visible slice of an input field and the cursor column within it.
 fn input_view(input: &Input, width: usize) -> (String, usize) {
     let chars: Vec<char> = input.text.chars().collect();
     let width = width.max(2);
@@ -792,12 +792,12 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
         None => "Neuer Task".to_string(),
         Some(id) => format!("Task bearbeiten · {id}"),
     };
-    // Titel, Hinweiszeile, übrige Felder, Rahmen
+    // Title, hint line, remaining fields, border
     let inner = popup(f, c, &title, 70, form.fields.len() as u16 + 3);
     let value_width = (inner.width as usize).saturating_sub(LABEL + 2);
     let mut lines: Vec<Line> = vec![];
     let mut cursor: Option<Position> = None;
-    // Tokens im Titel überschreiben beim Speichern die Felder – direkt am Feld zeigen.
+    // Title tokens override the fields on save – show that next to each field.
     let tokens = crate::quickadd::parse_str(&form.title.text, today).ok();
     let overrides = |c: &Palette, text: String| {
         Span::styled(format!("  ← Titel: {text}"), Style::new().fg(c.accent))
@@ -915,7 +915,7 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
     }
 }
 
-/// Zeigt, was die Tokens im Titel bewirken (`P1`, `due:…`, `@…`).
+/// Shows what the title tokens do (`P1`, `due:…`, `@…`).
 fn title_hint(
     app: &App,
     c: &Palette,
@@ -1021,7 +1021,7 @@ fn draw_filter(f: &mut Frame, app: &App, c: &Palette, idx: usize, checked: &[boo
     f.render_widget(Paragraph::new(lines), inner);
 }
 
-/// Eingabefeld-Zeile mit Label; liefert bei Fokus die Cursor-Position mit.
+/// Labelled input field line; also returns the cursor position when focused.
 fn field_line(
     c: &Palette,
     at: Position,

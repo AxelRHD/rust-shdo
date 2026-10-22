@@ -1,5 +1,5 @@
-//! Themes: semantische Farb-Tokens, eingebaut per `include_str!` oder als eigene
-//! TOML-Dateien in `~/.config/shdo/themes/`. Fehlende Tokens kommen vom Default-Theme.
+//! Themes: semantic color tokens, built in via `include_str!` or as custom
+//! TOML files in `~/.config/shdo/themes/`. Missing tokens come from the default theme.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -138,8 +138,8 @@ fn parse_theme(id: &str, raw: &str) -> Result<Theme> {
     })
 }
 
-/// Alle Themes alphabetisch nach Name: eingebaute und eigene (gleiche ID überschreibt).
-/// Fehlerhafte eigene Themes landen als Warnung im zweiten Wert.
+/// All themes sorted by name: built-in and custom (a custom theme with the same ID wins).
+/// Broken custom themes are returned as warnings.
 pub fn load_all(custom_dir: &Path) -> (Vec<Theme>, Vec<String>) {
     let mut themes: Vec<Theme> = BUILTIN
         .iter()
@@ -189,7 +189,7 @@ mod tests {
         assert_eq!(by_id(DEFAULT_THEME).c.bg, Color::Rgb(0x1a, 0x1b, 0x26));
         assert_eq!(by_id("nord").c.bg, Color::Rgb(0x2e, 0x34, 0x40));
         assert_eq!(by_id("terminal").c.bg, Color::Reset);
-        // Jedes eingebaute Theme setzt alle Tokens selbst (nichts erbt still vom Default).
+        // Every built-in theme sets all tokens itself (nothing silently inherits the default).
         for (id, raw) in BUILTIN {
             let file: ThemeFile = toml::from_str(raw).unwrap();
             assert_eq!(file.colors.len(), 17, "{id}");

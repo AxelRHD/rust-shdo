@@ -1,5 +1,5 @@
-//! Shell-Completion: statisch über `clap_complete`, für Fish zusätzlich dynamisch
-//! (IDs mit Titel, Status, Buckets, `due:`-Werte) über den versteckten Befehl `__complete`.
+//! Shell completion: static via `clap_complete`, plus dynamic suggestions for fish
+//! (IDs with title, statuses, buckets, `due:` values) via the hidden `__complete` command.
 
 use std::io::Write;
 
@@ -13,15 +13,15 @@ use crate::store::Store;
 
 #[derive(Clone, Copy, ValueEnum)]
 pub enum Kind {
-    /// IDs offener und erledigter Tasks, Titel als Beschreibung
+    /// IDs of open and done tasks, title as description
     Ids,
-    /// Status-Keys
+    /// Status keys
     Statuses,
-    /// Bucket-Keys plus „-“ zum Entfernen
+    /// Bucket keys plus "-" for removal
     Buckets,
-    /// Buckets als `@key` (Schnellerfassung, `ls`)
+    /// Buckets as `@key` (quick add, `ls`)
     AtBuckets,
-    /// `due:`-Kurzformen mit aufgelöstem Datum
+    /// `due:` shortcuts with the resolved date
     Due,
 }
 
@@ -89,7 +89,7 @@ Fish bekommt zusätzlich dynamische Vorschläge: Task-IDs mit Titel,
 Status, Buckets (@…) und due:-Werte mit Datum. Bash, Zsh, Elvish und
 PowerShell kennen Befehle und Optionen.";
 
-/// Anleitung für `shdo completions` ohne Shell, mit Hinweis auf die eigene Shell.
+/// Guide for `shdo completions` without a shell, pointing at the user's shell.
 pub fn setup_guide() -> String {
     let mut out = format!(
         "Gibt ein Completion-Skript für die Shell aus.\n\n\
@@ -116,7 +116,7 @@ pub fn print_script(shell: Shell, cmd: &mut clap::Command) {
         let _ = out.write_all(&buf);
         return;
     }
-    // clap_complete listet auch den versteckten Befehl; Zeilen dafür entfernen
+    // clap_complete also lists the hidden command; drop those lines
     let script = String::from_utf8_lossy(&buf);
     for line in script.lines().filter(|l| !l.contains("__complete")) {
         let _ = writeln!(out, "{line}");
@@ -133,7 +133,7 @@ pub fn print_script(shell: Shell, cmd: &mut clap::Command) {
     );
 }
 
-/// Vorschläge als `wert\tbeschreibung`, eine Zeile je Eintrag.
+/// Suggestions as `value\tdescription`, one line per entry.
 pub fn candidates(store: &Store, kind: Kind) -> Result<Vec<String>> {
     let lines = match kind {
         Kind::Ids => {

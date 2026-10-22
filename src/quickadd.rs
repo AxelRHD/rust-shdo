@@ -1,5 +1,5 @@
-//! Schnellerfassungs-Syntax: `Rechnung bezahlen P1 due:fr @work`.
-//! Gilt für die CLI und für das Eingabefeld der TUI.
+//! Quick-add syntax: `Pay invoice P1 due:fr @work`.
+//! Shared by the CLI and the TUI form.
 
 use anyhow::{Result, bail};
 use jiff::civil::Date;
@@ -11,7 +11,7 @@ pub struct QuickAdd {
     pub title: String,
     pub prio: Option<u8>,
     pub due: Option<Date>,
-    /// Roh-Eingabe nach `@`; aufgelöst wird gegen die Buckets in `shdo.toml`.
+    /// Raw input after `@`; resolved against the buckets in `shdo.toml`.
     pub bucket: Option<String>,
 }
 

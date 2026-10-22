@@ -1,7 +1,7 @@
-//! Gesetzliche Feiertage je Bundesland über das Crate `holiday_de`.
+//! Public holidays per German federal state via the `holiday_de` crate.
 //!
-//! Hier nur die Anbindung: Länderkürzel aus der Config, Umrechnung chrono → jiff und
-//! Kurznamen, die in die Kalenderleiste passen.
+//! Only the glue lives here: state codes from the config, chrono → jiff conversion and
+//! short names that fit into the calendar sidebar.
 
 use chrono::Datelike;
 use holiday_de::{GermanHoliday, GermanRegion};
@@ -32,7 +32,7 @@ const REGIONS: &[(&str, GermanRegion)] = &[
 pub struct Region(GermanRegion);
 
 impl Region {
-    /// Länderkürzel wie `bw`, `by`, `nw` (Groß-/Kleinschreibung egal).
+    /// State codes such as `bw`, `by`, `nw` (case-insensitive).
     pub fn from_code(code: &str) -> Option<Region> {
         let code = code.trim().to_lowercase();
         REGIONS
@@ -45,7 +45,7 @@ impl Region {
         REGIONS.iter().map(|(c, _)| *c)
     }
 
-    /// Feiertage zwischen `from` und `to` (jeweils einschließlich), nach Datum sortiert.
+    /// Holidays between `from` and `to` (both inclusive), sorted by date.
     pub fn between(self, from: Date, to: Date) -> Vec<(Date, &'static str)> {
         let mut days: Vec<(Date, &'static str)> = (from.year()..=to.year())
             .flat_map(|y| self.0.holiday_dates_in_year(y as i32))
@@ -65,7 +65,7 @@ impl Default for Region {
     }
 }
 
-/// Kurzname für die Leiste (Datum + Name in 24 Zeichen).
+/// Short name for the sidebar (date + name within 24 characters).
 fn short_name(h: GermanHoliday) -> &'static str {
     use GermanHoliday::*;
     match h {
@@ -123,7 +123,7 @@ mod tests {
         assert!(Region::from_code("BY").is_some());
         assert!(Region::from_code("xx").is_none());
         assert_eq!(Region::codes().count(), 16);
-        // Sachsen hat den Buß- und Bettag (Mittwoch vor dem 23.11.)
+        // Saxony has Buß- und Bettag (the Wednesday before Nov 23)
         let sn = Region::from_code("sn").unwrap();
         let nov = sn.between(date(2026, 11, 1), date(2026, 11, 30));
         assert_eq!(nov, [(date(2026, 11, 18), "Buß- u. Bettag")]);

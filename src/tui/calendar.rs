@@ -1,5 +1,5 @@
-//! Kalenderleiste: Vormonat, aktueller Monat und Folgemonat mit der Zahl fälliger Tasks je Tag.
-//! Reine Anzeige – kein Fokus, kein Filter.
+//! Calendar sidebar: previous, current and next month with the number of tasks due per day.
+//! Display only – no focus, no filtering.
 
 use std::collections::HashMap;
 
@@ -14,7 +14,7 @@ use ratatui::widgets::{Block, Paragraph};
 use super::app::App;
 use crate::theme::Palette;
 
-/// Rahmen (2) + Abstand (1) + KW (3) + 7 Tage à 3 Zeichen.
+/// Border (2) + padding (1) + week number (3) + 7 days of 3 characters.
 pub const WIDTH: u16 = 2 + 1 + 3 + 7 * 3;
 
 const MONTHS: [&str; 12] = [
@@ -32,7 +32,7 @@ const MONTHS: [&str; 12] = [
     "Dezember",
 ];
 
-/// Hochgestellte Anzahl im Zwischenraum hinter dem Tag; ab 10 `⁺`.
+/// Superscript count in the gap after the day; `⁺` from 10 on.
 fn superscript(n: usize) -> char {
     const DIGITS: [char; 10] = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
     if n < 10 { DIGITS[n] } else { '⁺' }
@@ -47,7 +47,7 @@ fn weeks_in_month(first: Date) -> usize {
     (offset + first.days_in_month() as usize).div_ceil(7)
 }
 
-/// Zeilen für einen Monat: Titel, Wochentage, Wochen, Leerzeile.
+/// Rows for one month: title, weekday header, weeks, blank line.
 fn month_height(first: Date) -> usize {
     3 + weeks_in_month(first)
 }
@@ -60,7 +60,7 @@ pub fn draw(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    // Offene, sichtbare Tasks je Fälligkeitstag (folgt Bucket-Filter, ohne Erledigt)
+    // Open, visible tasks per due date (follows the bucket filter, excludes done)
     let mut due: HashMap<Date, usize> = HashMap::new();
     for col in &app.board.columns[..app.board.last_index()] {
         for t in &col.tasks {
@@ -74,7 +74,7 @@ pub fn draw(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
     let current = first_of_month(today);
     let prev = current.checked_sub(1.month()).unwrap_or(current);
     let next = current.checked_add(1.month()).unwrap_or(current);
-    // So viele Monate wie in die Höhe passen: alle drei, sonst aktueller + Folgemonat, sonst nur aktueller
+    // As many months as fit: all three, else current + next, else only the current one
     let height = inner.height as usize;
     let months: Vec<Date> = [
         vec![prev, current, next],
@@ -104,7 +104,7 @@ pub fn draw(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
             c,
         );
     }
-    // Feiertage der angezeigten Monate, soweit Platz ist
+    // Holidays of the shown months, as far as space allows
     for (d, name) in holiday_list {
         if lines.len() >= height {
             break;
@@ -169,7 +169,7 @@ fn month_lines(
                 spans.push(Span::raw("   "));
                 continue;
             }
-            // Zwischenraum vor dem Tag: hier nichts, die Anzahl steht hinter dem Tag
+            // Gap before the day: nothing here, the count goes after the day
             spans.push(Span::raw(if i == 0 { " " } else { "" }));
             spans.push(Span::styled(
                 format!("{:>2}", d.day()),
@@ -225,11 +225,11 @@ mod tests {
 
     #[test]
     fn month_geometry() {
-        // Oktober 2026 beginnt an einem Donnerstag: 5 Wochenzeilen
+        // October 2026 starts on a Thursday: 5 week rows
         assert_eq!(weeks_in_month(date(2026, 10, 1)), 5);
-        // Februar 2027 beginnt am Montag und hat 28 Tage: genau 4 Wochen
+        // February 2027 starts on a Monday and has 28 days: exactly 4 weeks
         assert_eq!(weeks_in_month(date(2027, 2, 1)), 4);
-        // August 2027 beginnt am Sonntag: 6 Wochenzeilen
+        // August 2027 starts on a Sunday: 6 week rows
         assert_eq!(weeks_in_month(date(2027, 8, 1)), 6);
         assert_eq!(month_height(date(2026, 10, 1)), 8);
     }

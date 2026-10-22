@@ -1,4 +1,4 @@
-//! Gruppierung der Tasks nach Spalten, Bucket-Filter und Sortierung.
+//! Grouping tasks into columns, bucket filter and sorting.
 
 use std::cmp::Ordering;
 
@@ -8,10 +8,10 @@ use jiff::Zoned;
 use crate::store::{BoardConfig, BucketDef, StatusDef, Store, resolve_def};
 use crate::task::Task;
 
-/// Filter-Eintrag für Tasks ohne (gültigen) Bucket.
+/// Filter entry for tasks without a (valid) bucket.
 pub const NO_BUCKET: &str = "-";
 
-/// Welche Buckets angezeigt werden. Leer = alle.
+/// Which buckets are shown. Empty = all.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Filter {
     pub buckets: Vec<String>,
@@ -26,7 +26,7 @@ impl Filter {
         self.buckets.is_empty()
     }
 
-    /// Unbekannte Einträge fallen weg; bleibt nichts übrig oder ist alles gewählt, gilt „alle“.
+    /// Unknown entries are dropped; if nothing is left or everything is selected, it means "all".
     pub fn normalized(mut self, defs: &[BucketDef]) -> Filter {
         self.buckets
             .retain(|b| b == NO_BUCKET || defs.iter().any(|d| &d.key == b));
@@ -41,7 +41,7 @@ impl Filter {
         self.is_all() || self.buckets.iter().any(|b| b == bucket)
     }
 
-    /// Ist genau ein echter Bucket gewählt, erben neue Tasks ihn.
+    /// If exactly one real bucket is selected, new tasks inherit it.
     pub fn inherited(&self) -> Option<&str> {
         match self.buckets.as_slice() {
             [one] if one != NO_BUCKET => Some(one),
@@ -59,9 +59,9 @@ pub struct Board {
     pub columns: Vec<Column>,
     pub buckets: Vec<BucketDef>,
     pub filter: Filter,
-    /// Offene Tasks je Bucket (Reihenfolge wie `buckets`, zuletzt „ohne“), ungefiltert.
+    /// Open tasks per bucket (order as in `buckets`, then "none"), unfiltered.
     pub bucket_counts: Vec<usize>,
-    /// Durch den Filter ausgeblendete offene Tasks.
+    /// Open tasks hidden by the filter.
     pub hidden: usize,
     pub warnings: Vec<String>,
 }
@@ -73,8 +73,8 @@ impl Board {
         Ok(Board::build(cfg, tasks, warnings, filter.clone()))
     }
 
-    /// Tasks mit unbekanntem oder fehlendem Status landen in der ersten Spalte, Tasks mit
-    /// unbekanntem Bucket gelten als „ohne Bucket“ (jeweils mit Warnung).
+    /// Tasks with an unknown or missing status land in the first column, tasks with
+    /// an unknown bucket count as "no bucket" (both with a warning).
     pub fn build(
         cfg: BoardConfig,
         tasks: Vec<Task>,
@@ -171,7 +171,7 @@ impl Board {
             .map_or(key, |b| b.name.as_str())
     }
 
-    /// Kurzbeschreibung des Filters, z. B. „Arbeit“ oder „Privat, ohne Bucket“.
+    /// Short description of the filter, e.g. "Work" or "Home, no bucket".
     pub fn filter_label(&self) -> Option<String> {
         if self.filter.is_all() {
             return None;
@@ -199,8 +199,8 @@ impl Board {
     }
 }
 
-/// Bucket für einen neuen Task: explizit per `@…`, sonst geerbt aus dem Filter.
-/// Liefert (Bucket-Key, geerbt?).
+/// Bucket for a new task: explicit via `@…`, otherwise inherited from the filter.
+/// Returns (bucket key, inherited?).
 pub fn bucket_for_new(
     explicit: Option<&str>,
     filter: &Filter,
@@ -232,7 +232,7 @@ pub fn resolve_bucket(buckets: &[BucketDef], raw: &str) -> Result<String> {
     }
 }
 
-/// Setzt den Status `target` (Index) und speichert den Task.
+/// Sets status `target` (index) and saves the task.
 pub fn move_task(
     task: &mut Task,
     board_defs: &[StatusDef],
@@ -244,8 +244,8 @@ pub fn move_task(
     task.save()
 }
 
-/// Offene Spalten: prio, dann due (ohne zuletzt), dann created.
-/// Letzte Spalte: zuletzt erledigt zuerst (`done`, sonst mtime der Datei).
+/// Open columns: prio, then due (missing last), then created.
+/// Last column: most recently done first (`done`, else the file's mtime).
 pub fn sort_tasks(tasks: &mut [Task], done_column: bool) {
     if done_column {
         tasks.sort_by(|a, b| {
@@ -393,7 +393,7 @@ mod tests {
         assert_eq!(ids(&b.columns[0].tasks), ["n", "x"]);
         assert_eq!(b.filter.inherited(), None);
 
-        // Alles gewählt oder nur Unbekanntes gewählt = alle
+        // Everything or only unknown entries selected = all
         let full = Filter {
             buckets: vec!["home".into(), "work".into(), "-".into()],
         };
@@ -402,7 +402,7 @@ mod tests {
             buckets: vec!["alt".into()],
         };
         assert!(stale.normalized(&cfg.buckets).is_all());
-        // Ohne deklarierte Buckets wird nie gefiltert
+        // Without declared buckets nothing is ever filtered
         assert!(work.normalized(&[]).is_all());
     }
 }

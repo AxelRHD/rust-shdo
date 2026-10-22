@@ -1,4 +1,4 @@
-//! Datenverzeichnis: `shdo.toml`, `tasks/`, `archive/`.
+//! Data directory: `shdo.toml`, `tasks/`, `archive/`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -49,7 +49,7 @@ pub struct StatusDef {
     pub name: String,
 }
 
-/// Buckets haben dieselbe Form wie Status.
+/// Buckets have the same shape as statuses.
 pub type BucketDef = StatusDef;
 
 #[derive(Debug, Clone)]
@@ -60,7 +60,7 @@ pub struct BoardConfig {
 
 #[derive(Debug, serde::Deserialize)]
 struct BoardFile {
-    /// `columns` ist der frühere Name und wird weiter gelesen.
+    /// `columns` is the former name and is still accepted.
     #[serde(alias = "columns")]
     status: Option<Vec<StatusDef>>,
     #[serde(default)]
@@ -94,7 +94,7 @@ impl Store {
         Ok(())
     }
 
-    /// Legt die Struktur an. Gibt zurück, was neu angelegt wurde.
+    /// Creates the directory layout. Returns what was newly created.
     pub fn init(&self) -> Result<Vec<String>> {
         let mut created = Vec::new();
         for d in [self.dir.clone(), self.tasks_dir(), self.archive_dir()] {
@@ -102,7 +102,7 @@ impl Store {
                 fs::create_dir_all(&d).with_context(|| format!("{} anlegen", d.display()))?;
                 created.push(format!("{}/", d.display()));
             }
-            // Git versioniert keine leeren Verzeichnisse.
+            // Git does not track empty directories.
             let keep = d.join(".gitkeep");
             if d != self.dir && !keep.exists() {
                 fs::write(&keep, "")?;
@@ -116,7 +116,7 @@ impl Store {
         Ok(created)
     }
 
-    /// Status und Buckets aus `shdo.toml`; Default-Status bei fehlender Datei oder fehlendem Feld.
+    /// Statuses and buckets from `shdo.toml`; default statuses if the file or field is missing.
     pub fn board_config(&self) -> Result<BoardConfig> {
         let path = self.dir.join(BOARD_FILE);
         let raw = match fs::read_to_string(&path) {
@@ -145,7 +145,7 @@ impl Store {
         fs::write(&path, raw).with_context(|| format!("{} schreiben", path.display()))
     }
 
-    /// Neuen Bucket an `shdo.toml` anhängen; Kommentare bleiben erhalten.
+    /// Appends a new bucket to `shdo.toml`; comments are preserved.
     pub fn add_bucket(&self, key: &str, name: &str) -> Result<()> {
         let key = key.trim();
         let name = name.trim();
@@ -175,7 +175,7 @@ impl Store {
         self.save_board_doc(&doc)
     }
 
-    /// Anzeigenamen eines Buckets ändern; der key (und damit die Tasks) bleibt.
+    /// Changes a bucket's display name; the key (and thus the tasks) stays.
     pub fn rename_bucket(&self, key: &str, name: &str) -> Result<()> {
         let name = name.trim();
         if name.is_empty() {
@@ -189,7 +189,7 @@ impl Store {
         self.save_board_doc(&doc)
     }
 
-    /// Bucket aus `shdo.toml` entfernen. Was mit den Tasks passiert, entscheidet der Aufrufer.
+    /// Removes a bucket from `shdo.toml`. The caller decides what happens to its tasks.
     pub fn remove_bucket(&self, key: &str) -> Result<()> {
         let mut doc = self.board_doc()?;
         let arr = doc
@@ -207,7 +207,7 @@ impl Store {
         self.save_board_doc(&doc)
     }
 
-    /// Alle Tasks (ohne Archiv) in einem Bucket.
+    /// All tasks in a bucket (excluding the archive).
     pub fn tasks_in_bucket(&self, key: &str) -> Result<Vec<Task>> {
         let (tasks, _) = self.load_tasks()?;
         Ok(tasks
@@ -216,7 +216,7 @@ impl Store {
             .collect())
     }
 
-    /// Lädt alle Tasks aus `tasks/`. Ungültige Dateien landen als Warnung im zweiten Wert.
+    /// Loads all tasks from `tasks/`. Invalid files are returned as warnings.
     pub fn load_tasks(&self) -> Result<(Vec<Task>, Vec<String>)> {
         let mut tasks = Vec::new();
         let mut warnings = Vec::new();
@@ -258,7 +258,7 @@ impl Store {
         Task::new(&id, path, title, column, now)
     }
 
-    /// Sucht einen Task in `tasks/` über einen eindeutigen ID-Präfix.
+    /// Finds a task in `tasks/` by a unique ID prefix.
     pub fn find(&self, prefix: &str) -> Result<Task> {
         let prefix = prefix.trim().to_lowercase();
         if prefix.is_empty() {
@@ -296,7 +296,7 @@ impl Store {
             .with_context(|| format!("{} archivieren", task.path.display()))
     }
 
-    /// Fingerabdruck von `tasks/` und `shdo.toml`, um externe Änderungen zu bemerken.
+    /// Fingerprint of `tasks/` and `shdo.toml` to detect external changes.
     pub fn fingerprint(&self) -> u64 {
         use std::hash::{DefaultHasher, Hash, Hasher};
         let mut h = DefaultHasher::new();
@@ -355,8 +355,8 @@ fn validate_keys(defs: &[StatusDef], what: &str) -> Result<()> {
     Ok(())
 }
 
-/// Findet einen Eintrag über key oder Name (Groß-/Kleinschreibung egal);
-/// sonst über einen eindeutigen Präfix von key oder einem Wort des Namens.
+/// Finds an entry by key or name (case-insensitive),
+/// otherwise by a unique prefix of the key or of a word in the name.
 fn bucket_tables(doc: &mut toml_edit::DocumentMut) -> impl Iterator<Item = &mut toml_edit::Table> {
     doc.get_mut("buckets")
         .and_then(|i| i.as_array_of_tables_mut())
@@ -380,7 +380,7 @@ fn validate_bucket_key(key: &str) -> Result<()> {
     Ok(())
 }
 
-/// Vorschlag für einen key aus dem Namen: „Bücher & Co.“ → `buecher-co`.
+/// Suggests a key from a name: "Bücher & Co." → `buecher-co`.
 pub fn key_from_name(name: &str) -> String {
     let mut out = String::new();
     for ch in name.trim().to_lowercase().chars() {
@@ -467,7 +467,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(cfg.statuses.len(), 4);
-        // früherer Name
+        // former name
         let legacy = parse_board("[[columns]]\nkey='a'\nname='A'").unwrap();
         assert_eq!(legacy.statuses[0].key, "a");
         assert_eq!(cfg.buckets.len(), 2);

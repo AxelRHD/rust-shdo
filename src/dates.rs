@@ -1,4 +1,4 @@
-//! Parsen von Datumseingaben (`due:`) und deutsche Kurzdarstellung von Daten.
+//! Parsing of date input (`due:`) and short German date formatting.
 
 use anyhow::{Result, bail};
 use jiff::civil::{Date, Weekday};
@@ -19,10 +19,10 @@ pub fn today() -> Date {
     jiff::Zoned::now().date()
 }
 
-/// Parst eine Datumseingabe relativ zu `today`.
+/// Parses a date input relative to `today`.
 ///
-/// Unterstützt: `2026-10-24`, `24.10.`, `24.10.2026`, `+3d`, `+2w`, `+1m`,
-/// `heute`, `morgen`, `übermorgen` und Wochentage (`mo`–`so`, nächstes Vorkommen).
+/// Supports `2026-10-24`, `24.10.`, `24.10.2026`, `+3d`, `+2w`, `+1m`,
+/// `heute`, `morgen`, `übermorgen` and weekdays (`mo`–`so`, next occurrence).
 pub fn parse_date(input: &str, today: Date) -> Result<Date> {
     let s = input.trim().to_lowercase();
     if s.is_empty() {
@@ -68,7 +68,7 @@ fn parse_relative(rel: &str, today: Date) -> Option<Date> {
     today.checked_add(span).ok()
 }
 
-/// `24.10.` (nächstes Vorkommen) oder `24.10.2026`.
+/// `24.10.` (next occurrence) or `24.10.2026`.
 fn parse_german(s: &str, today: Date) -> Option<Date> {
     let parts: Vec<&str> = s.split('.').collect();
     let (day, month, year) = match parts.as_slice() {
@@ -116,7 +116,7 @@ fn short(d: Date, today: Date) -> String {
     }
 }
 
-/// Wochentag und volles Datum, z. B. „fr 23.10.2026“.
+/// Weekday and full date, e.g. "fr 23.10.2026".
 pub fn fmt_long(d: Date) -> String {
     format!(
         "{} {:02}.{:02}.{}",
@@ -127,7 +127,7 @@ pub fn fmt_long(d: Date) -> String {
     )
 }
 
-/// Kurzform für Fälligkeiten: `heute`, `morgen`, `gestern`, `fr 24.10.`, `24.10.`.
+/// Short form for due dates: `heute`, `morgen`, `gestern`, `fr 24.10.`, `24.10.`.
 pub fn fmt_due(due: Date, today: Date) -> String {
     match days_between(today, due) {
         0 => "heute".into(),
@@ -142,7 +142,7 @@ pub fn local_date(ts: Timestamp) -> Date {
     ts.to_zoned(TimeZone::system()).date()
 }
 
-/// „seit heute“, „seit gestern“, „seit 3 Tagen“.
+/// "seit heute", "seit gestern", "seit 3 Tagen" (since today/yesterday/3 days).
 pub fn fmt_since(ts: Timestamp, today: Date) -> String {
     match days_between(local_date(ts), today) {
         i64::MIN..=0 => "seit heute".into(),
@@ -151,7 +151,7 @@ pub fn fmt_since(ts: Timestamp, today: Date) -> String {
     }
 }
 
-/// „heute“, „gestern“, „vor 3 Tagen“, ab einer Woche das Datum.
+/// "heute", "gestern", "vor 3 Tagen"; the date from one week on.
 pub fn fmt_ago(ts: Timestamp, today: Date) -> String {
     let d = local_date(ts);
     match days_between(d, today) {
@@ -162,7 +162,7 @@ pub fn fmt_ago(ts: Timestamp, today: Date) -> String {
     }
 }
 
-/// Vollständige lokale Darstellung für die Detailansicht.
+/// Full local timestamp for the detail view.
 pub fn fmt_timestamp(ts: Timestamp) -> String {
     ts.to_zoned(TimeZone::system())
         .strftime("%d.%m.%Y %H:%M")
@@ -174,7 +174,7 @@ mod tests {
     use super::*;
     use jiff::civil::date;
 
-    // Donnerstag
+    // Thursday
     const TODAY: Date = date(2026, 10, 22);
 
     #[test]

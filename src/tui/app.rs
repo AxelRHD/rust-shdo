@@ -1,4 +1,4 @@
-//! App-State und Aktionen der TUI.
+//! TUI application state and actions.
 
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
@@ -50,20 +50,20 @@ pub enum Mode {
     Detail {
         scroll: u16,
     },
-    /// Einträge: Buckets in Reihenfolge von `shdo.toml`, zuletzt „ohne Bucket“.
+    /// Entries: buckets in `shdo.toml` order, then "no bucket".
     Filter {
         idx: usize,
         checked: Vec<bool>,
         original: Filter,
     },
-    /// 0 = ohne Bucket, sonst Index + 1.
+    /// 0 = no bucket, otherwise index + 1.
     PickBucket {
         idx: usize,
     },
     BucketNew {
         name: Input,
         key: Input,
-        /// key von Hand geändert – dann nicht mehr aus dem Namen ableiten
+        /// key edited by hand – stop deriving it from the name
         key_edited: bool,
         focus_key: bool,
     },
@@ -77,7 +77,7 @@ pub enum Mode {
         done: usize,
         idx: usize,
     },
-    /// Ziel für die Tasks eines zu löschenden Buckets (nur andere Buckets).
+    /// Target for the tasks of a bucket being deleted (other buckets only).
     BucketMove {
         key: String,
         idx: usize,
@@ -100,13 +100,13 @@ pub enum DeleteChoice {
     Cancel,
 }
 
-/// Was beim Löschen eines Buckets mit seinen Tasks passiert.
+/// What happens to a bucket's tasks when the bucket is deleted.
 enum Retarget {
-    /// Bucket ist leer
+    /// The bucket is empty
     Keep,
-    /// Bucket der Tasks ersetzen (None = ohne Bucket)
+    /// Replace the tasks' bucket (None = no bucket)
     To(Option<String>),
-    /// alle (erledigten) Tasks archivieren
+    /// Archive all (done) tasks
     Archive,
 }
 
@@ -118,14 +118,14 @@ pub struct App {
     filter: Filter,
     pub col: usize,
     pub rows: Vec<usize>,
-    /// Scroll-Offset je Spalte (in Karten), wird beim Rendern nachgeführt.
+    /// Scroll offset per column (in cards), updated while rendering.
     pub offsets: Vec<usize>,
-    /// Erste sichtbare Spalte, falls nicht alle Spalten nebeneinander passen.
+    /// First visible column when not all columns fit side by side.
     pub col_offset: usize,
     pub mode: Mode,
-    /// Letzte Spalte (erledigt) anzeigen; lokal gespeichert.
+    /// Show the last column (done); stored per machine.
     pub show_done: bool,
-    /// Kalenderleiste anzeigen; lokal gespeichert.
+    /// Show the calendar sidebar; stored per machine.
     pub show_calendar: bool,
     pub region: Region,
     pub status: Option<(Level, String)>,
@@ -221,7 +221,7 @@ impl App {
             .get(self.rows[self.col])
     }
 
-    /// Anzahl der angezeigten Spalten (ohne „Erledigt“, falls ausgeblendet).
+    /// Number of displayed columns (without "done" if hidden).
     pub fn visible_columns(&self) -> usize {
         let n = self.board.columns.len();
         if self.show_done || n == 1 { n } else { n - 1 }
@@ -270,7 +270,7 @@ impl App {
         }
     }
 
-    /// Board neu laden; `follow` wählt danach diese Karte aus (Spalte wechselt mit).
+    /// Reloads the board; `follow` selects that card afterwards (switching column if needed).
     pub fn reload(&mut self, follow: Option<String>) {
         match Board::load(&self.store, &self.filter) {
             Ok(b) => self.board = b,
@@ -297,7 +297,7 @@ impl App {
         self.col = self.col.min(self.visible_columns() - 1);
     }
 
-    /// Regelmäßig aufgerufen: Sync-Ergebnis abholen, externe Änderungen erkennen.
+    /// Called periodically: collects the sync result and detects external changes.
     pub fn tick(&mut self) {
         if let Some(rx) = &self.sync_rx
             && let Ok(res) = rx.try_recv()
@@ -497,7 +497,7 @@ impl App {
         self.rows[self.col] = row.saturating_add(delta).clamp(0, len as isize - 1) as usize;
     }
 
-    /// Wendet `f` auf die selektierte Karte an, speichert und lädt neu.
+    /// Applies `f` to the selected card, saves and reloads.
     fn edit_selected(&mut self, ok: &str, f: impl FnOnce(&mut Task)) {
         let Some(mut task) = self.selected().cloned() else {
             return;
@@ -526,7 +526,7 @@ impl App {
         self.report(res, msg);
     }
 
-    /// Erledigt bzw. wieder offen (erste Spalte); die Auswahl bleibt in der Spalte.
+    /// Done or reopened (first column); the selection stays in the column.
     fn toggle_done(&mut self) {
         let Some(mut task) = self.selected().cloned() else {
             return;
@@ -552,7 +552,7 @@ impl App {
         self.report(res, format!("gelöscht: {}", task.title));
     }
 
-    /// Gibt `false` zurück, wenn die Eingabe ungültig ist und offen bleiben soll.
+    /// Returns `false` if the input is invalid and should stay open.
     fn submit_input(&mut self, kind: InputKind, text: &str) -> bool {
         let today = dates::today();
         match kind {
@@ -592,7 +592,7 @@ impl App {
         }
     }
 
-    /// Speichert das Formular. Tokens im Titel (`P1`, `due:…`, `@…`) haben Vorrang vor den Feldern.
+    /// Saves the form. Tokens in the title (`P1`, `due:…`, `@…`) take precedence over the fields.
     fn submit_form(&mut self, form: &Form) -> Result<()> {
         let today = dates::today();
         let q = quickadd::parse_str(&form.title.text, today)?;
@@ -614,7 +614,7 @@ impl App {
             Some(id) => (self.store.find(id)?, false),
         };
         task.set_title(&q.title);
-        // Normale Prio nur schreiben, wenn sie schon explizit gesetzt war.
+        // Only write normal priority if it was already set explicitly.
         if prio != PRIO_DEFAULT || task.prio.is_some() {
             task.set_prio(Some(prio));
         }
@@ -680,7 +680,7 @@ impl App {
         self.open_filter_at(0);
     }
 
-    /// Filter-Popup (wieder) öffnen, Cursor auf Zeile `idx`.
+    /// Opens (or reopens) the filter popup with the cursor on row `idx`.
     fn open_filter_at(&mut self, idx: usize) {
         let f = &self.board.filter;
         let mut checked: Vec<bool> = self
@@ -715,7 +715,7 @@ impl App {
         Filter { buckets }.normalized(&self.board.buckets)
     }
 
-    /// Filter sofort anwenden (Live-Vorschau), Auswahl bleibt auf der Karte, falls sichtbar.
+    /// Applies the filter immediately (live preview); keeps the selected card if still visible.
     fn apply_filter(&mut self, filter: Filter) {
         self.filter = filter;
         let keep = self.selected_id();
@@ -743,7 +743,7 @@ impl App {
                 }
             }
             KeyCode::Char('o') => {
-                // nur diesen einen
+                // only this one
                 checked
                     .iter_mut()
                     .enumerate()
@@ -816,7 +816,7 @@ impl App {
             .unwrap_or(0)
     }
 
-    /// (offen, erledigt) aller Tasks im Bucket, unabhängig vom Filter.
+    /// (open, done) counts of all tasks in the bucket, regardless of the filter.
     fn bucket_counts(&self, key: &str) -> Result<(usize, usize)> {
         let done_key = &self.board.columns[self.board.last_index()].def.key;
         let tasks = self.store.tasks_in_bucket(key)?;
@@ -894,7 +894,7 @@ impl App {
         }
     }
 
-    /// Wahlmöglichkeiten beim Löschen: (Aktion, erlaubt, Text).
+    /// Choices when deleting: (action, allowed, label).
     pub fn delete_choices(&self, open: usize, done: usize) -> Vec<(DeleteChoice, bool, String)> {
         if open + done == 0 {
             return vec![
@@ -993,7 +993,7 @@ impl App {
         }
     }
 
-    /// Ziele beim Verschieben: alle anderen Buckets.
+    /// Move targets: all other buckets.
     pub fn move_targets(&self, bucket: &str) -> Vec<(String, String)> {
         self.board
             .buckets
@@ -1053,7 +1053,7 @@ impl App {
                 }
             }
             self.store.remove_bucket(bucket)?;
-            // Aus dem gespeicherten Filter entfernen, sonst bleibt ein toter Eintrag stehen
+            // Drop it from the saved filter, otherwise a dead entry remains
             if self.filter.buckets.iter().any(|b| b == bucket) {
                 self.filter.buckets.retain(|b| b != bucket);
                 config::set_list(&self.cfg_path, "buckets", &self.filter.buckets)?;
