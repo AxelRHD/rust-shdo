@@ -9,7 +9,6 @@ pub enum Lang {
     En,
 }
 
-#[allow(dead_code)] // ALL and native_name are used by the upcoming setup wizard
 impl Lang {
     pub const ALL: [Lang; 2] = [Lang::En, Lang::De];
 

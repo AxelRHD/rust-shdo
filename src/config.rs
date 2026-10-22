@@ -147,6 +147,39 @@ pub fn set_list(path: &Path, key: &str, vals: &[String]) -> Result<()> {
     })
 }
 
+/// Result of the setup dialog.
+pub struct Setup {
+    pub language: Lang,
+    /// Data directory as entered (may start with `~`).
+    pub dir: String,
+    /// `holidays` value such as `de-bw`; `None` = no holidays.
+    pub holidays: Option<String>,
+}
+
+/// Writes the setup choices; other settings and comments in an existing file stay.
+pub fn write_setup(path: &Path, setup: &Setup) -> Result<()> {
+    update(path, |doc| {
+        doc["language"] = value(setup.language.code());
+        doc["dir"] = value(setup.dir.as_str());
+        match &setup.holidays {
+            Some(h) => doc["holidays"] = value(h.as_str()),
+            None => {
+                doc.remove("holidays");
+            }
+        }
+    })
+}
+
+/// `/home/me/x` → `~/x`, for display and for storing paths in the config.
+pub fn contract_tilde(p: &Path) -> String {
+    let home = home();
+    match p.strip_prefix(&home) {
+        Ok(rest) if rest.as_os_str().is_empty() => "~".into(),
+        Ok(rest) => format!("~/{}", rest.display()),
+        Err(_) => p.display().to_string(),
+    }
+}
+
 fn update(path: &Path, f: impl FnOnce(&mut DocumentMut)) -> Result<()> {
     let raw = match fs::read_to_string(path) {
         Ok(raw) => raw,
@@ -174,6 +207,31 @@ mod tests {
         let cfg = AppConfig::load(&tmp.path().join("nope.toml")).unwrap();
         assert!(cfg.dir.is_none());
         assert_eq!(cfg.data_dir(Some(Path::new("/x"))), PathBuf::from("/x"));
+    }
+
+    #[test]
+    fn setup_is_written_and_read_back() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("config.toml");
+        let mut setup = Setup {
+            language: Lang::De,
+            dir: "~/notes/tasks".into(),
+            holidays: Some("de-by".into()),
+        };
+        write_setup(&path, &setup).unwrap();
+        let cfg = AppConfig::load(&path).unwrap();
+        assert_eq!(cfg.lang(), Lang::De);
+        assert_eq!(cfg.data_dir(None), home().join("notes/tasks"));
+        assert_eq!(cfg.holidays.as_deref(), Some("de-by"));
+        setup.holidays = None;
+        write_setup(&path, &setup).unwrap();
+        assert!(AppConfig::load(&path).unwrap().holidays.is_none());
+        assert!(
+            fs::read_to_string(&path)
+                .unwrap()
+                .contains("# Data directory")
+        );
+        assert_eq!(contract_tilde(&home().join("a/b")), "~/a/b");
     }
 
     #[test]

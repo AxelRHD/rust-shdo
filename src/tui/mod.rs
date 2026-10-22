@@ -3,6 +3,7 @@
 mod app;
 mod calendar;
 mod form;
+mod setup;
 mod ui;
 
 use std::io::stdout;
@@ -23,14 +24,46 @@ use app::App;
 
 const TICK: Duration = Duration::from_millis(500);
 
-pub fn run(store: Store, cfg: AppConfig, cfg_path: PathBuf) -> Result<()> {
+/// Opens the board. With `setup`, the setup dialog runs first (first start or `shdo setup`).
+pub fn run(cli_dir: Option<PathBuf>, cfg: AppConfig, cfg_path: PathBuf, setup: bool) -> Result<()> {
     crate::i18n::set(cfg.lang());
-    let mut app = App::new(store, cfg, cfg_path)?;
     // ratatui::init also installs a panic hook that restores the terminal.
     let mut terminal = ratatui::init();
-    let res = event_loop(&mut terminal, &mut app);
+    let res = run_in(&mut terminal, cli_dir, cfg, cfg_path, setup);
     ratatui::restore();
     res
+}
+
+fn run_in(
+    terminal: &mut DefaultTerminal,
+    cli_dir: Option<PathBuf>,
+    mut cfg: AppConfig,
+    cfg_path: PathBuf,
+    setup: bool,
+) -> Result<()> {
+    if setup {
+        let palette = theme_for(&cfg);
+        if setup::run(terminal, &cfg, &cfg_path, cli_dir.clone(), &palette)?.is_none() {
+            return Ok(());
+        }
+        cfg = AppConfig::load(&cfg_path)?;
+    }
+    let store = Store::new(cfg.data_dir(cli_dir.as_deref()));
+    store.ensure_initialized()?;
+    let mut app = App::new(store, cfg, cfg_path)?;
+    event_loop(terminal, &mut app)
+}
+
+/// Colors for the setup dialog: the configured theme or the default.
+fn theme_for(cfg: &AppConfig) -> crate::theme::Palette {
+    let (themes, _) = crate::theme::load_all(&crate::config::config_dir().join("themes"));
+    let wanted = cfg.theme.as_deref().unwrap_or(crate::theme::DEFAULT_THEME);
+    themes
+        .iter()
+        .find(|t| t.id == wanted)
+        .or_else(|| themes.iter().find(|t| t.id == crate::theme::DEFAULT_THEME))
+        .map(|t| t.c.clone())
+        .expect("default theme exists")
 }
 
 fn event_loop(terminal: &mut DefaultTerminal, app: &mut App) -> Result<()> {

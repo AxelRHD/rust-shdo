@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "A kanban board for the terminal: tasks are Markdown files in a git repository"
 license = "MIT"
+repository = "https://github.com/AxelRHD/rust-shdo"
 readme = "README.md"
 keywords = ["todo", "kanban", "tui", "git", "tasks"]
 categories = ["command-line-utilities"]
@@ -17,7 +18,7 @@ clap_complete = "4.6.11"
 fastrand = "2.5.0"
 holiday_de = "0.1.2"
 jiff = "0.2.38"
-ratatui = "0.30.2"
+ratatui = { version = "0.30.2", features = ["unstable-rendered-line-info"] }
 rust-i18n = "4.2.4"
 serde = { version = "1.0.229", features = ["derive"] }
 toml = "1.1.8"

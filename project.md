@@ -39,6 +39,22 @@ welche Tasten es gibt. Die CLI dient der schnellen Erfassung und Skripten.
 - `git` über `std::process::Command`, keine libgit2-Abhängigkeit
 - Dev: `tempfile`
 
+## Sprache und Einrichtung
+
+- TUI auf Englisch (US) oder Deutsch (`language` in `config.toml`, sonst nach `$LANG`);
+  die CLI ist immer englisch. Texte in `locales/app.yml` (rust-i18n), Tests prüfen, dass
+  jeder Schlüssel beide Sprachen hat und jeder im Code genutzte Schlüssel existiert
+- Datumseingabe in beiden Sprachen (`heute`/`today`, `fr`/`fri`, `24.10.`/`10/24`), Anzeige
+  in der eingestellten Sprache (`FR 24.10.` / `FRI 10/24`); Kalender in en-US ab Sonntag
+- Feldnamen und Keys in Dateien sind immer englisch
+- Erststart (keine `config.toml`): Einrichtungsdialog in der TUI, später erneut mit
+  `shdo setup`. Schritte: Sprache (wechselt live) → Datenverzeichnis → Feiertage (keine /
+  Deutschland, bei Deutsch vorausgewählt) → Bundesland → Zusammenfassung
+- Prüfung des Datenverzeichnisses, nie ablehnend: bestehendes shdo-Verzeichnis wird
+  übernommen, nicht leerer Ordner oder fremdes Git-Repo nur mit Hinweis und zweitem Enter,
+  Datei wird abgelehnt
+- Abbruch (`Esc` im ersten Schritt, `Ctrl+C`) schreibt nichts
+
 ## Konfiguration
 
 ### App-Config (rechnerlokal, nicht synchronisiert)
@@ -48,7 +64,7 @@ welche Tasten es gibt. Die CLI dient der schnellen Erfassung und Skripten.
 shdo um (z. B. für die Demo), ohne dem Editor seine Config zu nehmen.
 
 ```toml
-dir = "~/tasks"      # Datenverzeichnis
+dir = "~/.local/share/shdo"  # Datenverzeichnis (Default)
 editor = "hx"        # optional
 theme = "tokyonight" # wird von der TUI geschrieben (`t`)
 buckets = ["work"]   # angezeigte Buckets, wird von der TUI geschrieben (`f`)
@@ -57,7 +73,7 @@ show_calendar = true # Kalenderleiste anzeigen, wird von der TUI geschrieben (`c
 holidays = "bw"      # Bundesland für Feiertage (bw, by, be, bb, hb, hh, he, mv, ni, nw, rp, sl, sn, st, sh, th)
 ```
 
-- Datenverzeichnis: `--dir` > `dir` aus der Config > `~/tasks`
+- Datenverzeichnis: `--dir` > `dir` aus der Config > `$XDG_DATA_HOME/shdo` (`~/.local/share/shdo`)
 - Schreiben (Theme, Filter) erfolgt über `toml_edit`, Kommentare bleiben erhalten
 - Der Bucket-Filter ist bewusst rechnerlokal: Arbeitsrechner zeigt „Arbeit“, privat „Privat“
   – bei denselben synchronisierten Daten. Leer = alle, `"-"` = ohne Bucket
@@ -436,7 +452,7 @@ mise-Tasks in `.mise-tasks/`:
 | `check:all`    | fmt + clippy + Tests                                   |
 | `install`      | `cargo install --path .` + Fish-Completion             |
 
-Tests arbeiten in temporären Verzeichnissen, nie in `~/tasks`; Datumstests mit fester Referenzzeit.
+Tests arbeiten in temporären Verzeichnissen, nie im echten Datenverzeichnis; Datumstests mit fester Referenzzeit.
 
 ## Später / Ideen
 

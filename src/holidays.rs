@@ -59,7 +59,6 @@ impl Region {
     }
 
     /// Setting value for a German state code, e.g. `de-bw`.
-    #[allow(dead_code)] // used by the upcoming setup wizard
     pub fn setting_for_state(code: &str) -> String {
         format!("de-{code}")
     }

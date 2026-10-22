@@ -571,9 +571,15 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
             vec![("j/k", "kb.select"), ("⏎", "kb.set"), ("Esc", "kb.cancel")]
         }
     };
+    key_hints(&keys, c, width)
+}
+
+/// Renders `[key → label]` hints (labels are translation keys), wrapping onto a second
+/// line when one is not enough.
+pub(super) fn key_hints(keys: &[(&str, &str)], c: &Palette, width: u16) -> Vec<Line<'static>> {
     let mut lines = vec![vec![Span::raw(" ")]];
     let mut used = 1;
-    for (k, label) in keys {
+    for &(k, label) in keys {
         let label = t!(label);
         let item_width = k.width() + label.width() + 6;
         if used + item_width > width as usize && used > 1 && lines.len() < 2 {
@@ -590,7 +596,7 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
     lines.into_iter().map(Line::from).collect()
 }
 
-fn popup(f: &mut Frame, c: &Palette, title: &str, width: u16, height: u16) -> Rect {
+pub(super) fn popup(f: &mut Frame, c: &Palette, title: &str, width: u16, height: u16) -> Rect {
     let area = f.area();
     let w = width.min(area.width.saturating_sub(2));
     let h = height.min(area.height.saturating_sub(2));
@@ -777,7 +783,7 @@ fn draw_confirm(f: &mut Frame, app: &App, c: &Palette) {
 }
 
 /// Visible slice of an input field and the cursor column within it.
-fn input_view(input: &Input, width: usize) -> (String, usize) {
+pub(super) fn input_view(input: &Input, width: usize) -> (String, usize) {
     let chars: Vec<char> = input.text.chars().collect();
     let width = width.max(2);
     let mut start = 0;

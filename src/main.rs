@@ -76,6 +76,8 @@ enum Cmd {
     Archive,
     /// Set up the data directory (including git init)
     Init,
+    /// Run the setup dialog again (language, data directory, holidays)
+    Setup,
     /// Print a shell completion script (without argument: setup guide)
     #[command(after_help = completion::SETUP_HELP)]
     Completions {
@@ -100,6 +102,7 @@ const SUBCOMMANDS: &[&str] = &[
     "sync",
     "archive",
     "init",
+    "setup",
     "bucket",
     "completions",
 ];
@@ -124,8 +127,12 @@ fn run() -> Result<()> {
     let all = Filter::all();
 
     let Some(cmd) = cli.cmd else {
-        store.ensure_initialized()?;
-        return tui::run(store, cfg, cfg_path);
+        // First start: no config yet, so ask for language, directory and holidays
+        let first_run = !cfg_path.exists();
+        if !first_run {
+            store.ensure_initialized()?;
+        }
+        return tui::run(cli.dir, cfg, cfg_path, first_run);
     };
     match &cmd {
         Cmd::Text(words) => guard_typo(words)?,
@@ -146,7 +153,7 @@ fn run() -> Result<()> {
         }
         _ => {}
     }
-    if !matches!(cmd, Cmd::Init) {
+    if !matches!(cmd, Cmd::Init | Cmd::Setup) {
         store.ensure_initialized()?;
     }
     match cmd {
@@ -222,6 +229,7 @@ fn run() -> Result<()> {
             Ok(())
         }
         Cmd::Init => init(&store, cfg.lang()),
+        Cmd::Setup => tui::run(cli.dir, cfg, cfg_path, true),
         // already handled before the initialization check
         Cmd::Completions { .. } | Cmd::Complete { .. } => Ok(()),
     }

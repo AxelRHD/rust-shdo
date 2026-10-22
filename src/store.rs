@@ -71,6 +71,20 @@ struct BoardFile {
     buckets: Vec<BucketDef>,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum DirState {
+    /// Does not exist yet and will be created.
+    Missing,
+    /// Exists and is empty.
+    Empty,
+    /// Already a shdo directory; it is used as is.
+    Shdo,
+    /// Exists with other content; shdo adds its files next to it.
+    Foreign { entries: usize, git: bool },
+    /// A file, not a directory.
+    NotADir,
+}
+
 pub struct Store {
     pub dir: PathBuf,
 }
@@ -86,6 +100,29 @@ impl Store {
 
     pub fn archive_dir(&self) -> PathBuf {
         self.dir.join("archive")
+    }
+
+    /// What is at the data directory path, so the setup can warn before using it.
+    pub fn dir_state(&self) -> DirState {
+        let dir = &self.dir;
+        if !dir.exists() {
+            return DirState::Missing;
+        }
+        if !dir.is_dir() {
+            return DirState::NotADir;
+        }
+        if dir.join(BOARD_FILE).is_file() || self.tasks_dir().is_dir() {
+            return DirState::Shdo;
+        }
+        let entries = fs::read_dir(dir).map(|rd| rd.count()).unwrap_or(0);
+        if entries == 0 {
+            DirState::Empty
+        } else {
+            DirState::Foreign {
+                entries,
+                git: dir.join(".git").exists(),
+            }
+        }
     }
 
     pub fn ensure_initialized(&self) -> Result<()> {
@@ -483,6 +520,29 @@ mod tests {
         assert_eq!(resolve_def(&cfg.buckets, "arb"), Some(1));
         assert_eq!(resolve_def(&cfg.buckets, "HOME"), Some(0));
         assert_eq!(resolve_def(&cfg.buckets, ""), None);
+    }
+
+    #[test]
+    fn dir_states() {
+        let tmp = tempfile::tempdir().unwrap();
+        let at = |p: &str| Store::new(tmp.path().join(p));
+        assert_eq!(at("neu").dir_state(), DirState::Missing);
+        fs::create_dir(tmp.path().join("leer")).unwrap();
+        assert_eq!(at("leer").dir_state(), DirState::Empty);
+        fs::create_dir_all(tmp.path().join("fremd/.git")).unwrap();
+        fs::write(tmp.path().join("fremd/notes.txt"), "x").unwrap();
+        assert_eq!(
+            at("fremd").dir_state(),
+            DirState::Foreign {
+                entries: 2,
+                git: true
+            }
+        );
+        fs::write(tmp.path().join("datei"), "x").unwrap();
+        assert_eq!(at("datei").dir_state(), DirState::NotADir);
+        let s = at("repo");
+        s.init(Lang::En).unwrap();
+        assert_eq!(s.dir_state(), DirState::Shdo);
     }
 
     #[test]

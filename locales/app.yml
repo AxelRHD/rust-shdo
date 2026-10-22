@@ -905,3 +905,92 @@ cal.month.11:
 cal.month.12:
   en: "December"
   de: "Dezember"
+
+# Setup ---------------------------------------------------------------------
+kb.next:
+  en: "next"
+  de: "weiter"
+kb.back:
+  en: "back"
+  de: "zurück"
+kb.finish:
+  en: "save and start"
+  de: "speichern und loslegen"
+setup.title:
+  en: "Welcome to shdo"
+  de: "Willkommen bei shdo"
+setup.step:
+  en: "step %{n} of %{total}"
+  de: "Schritt %{n} von %{total}"
+setup.lang.title:
+  en: "Language"
+  de: "Sprache"
+setup.lang.hint:
+  en: "Language of the board. The command line is always English."
+  de: "Sprache des Boards. Die Kommandozeile ist immer englisch."
+setup.dir.title:
+  en: "Data directory"
+  de: "Datenverzeichnis"
+setup.dir.hint:
+  en: "Tasks are stored here as Markdown files in a git repository."
+  de: "Hier liegen die Tasks als Markdown-Dateien in einem Git-Repo."
+setup.dir.missing:
+  en: "does not exist yet – will be created"
+  de: "existiert noch nicht – wird angelegt"
+setup.dir.empty:
+  en: "empty directory – will be set up"
+  de: "leerer Ordner – wird eingerichtet"
+setup.dir.shdo:
+  en: "existing shdo directory – used as is"
+  de: "bestehendes shdo-Verzeichnis – wird übernommen"
+setup.dir.foreign:
+  en: "not empty (%{n} entries) – shdo adds tasks/, archive/ and shdo.toml"
+  de: "nicht leer (%{n} Einträge) – shdo legt tasks/, archive/ und shdo.toml dazu"
+setup.dir.foreign_git:
+  en: "git repository with %{n} entries – shdo adds tasks/, archive/ and shdo.toml"
+  de: "Git-Repo mit %{n} Einträgen – shdo legt tasks/, archive/ und shdo.toml dazu"
+setup.dir.confirm:
+  en: "Press Enter again to use it anyway."
+  de: "Zum Übernehmen nochmal Enter drücken."
+setup.dir.not_a_dir:
+  en: "this is a file, not a directory"
+  de: "das ist eine Datei, kein Ordner"
+setup.dir.empty_input:
+  en: "please enter a directory"
+  de: "bitte einen Ordner angeben"
+setup.country.title:
+  en: "Public holidays"
+  de: "Feiertage"
+setup.country.hint:
+  en: "Shown in the calendar. Optional."
+  de: "Werden im Kalender angezeigt. Optional."
+setup.country.none:
+  en: "None"
+  de: "Keine"
+setup.country.de:
+  en: "Germany"
+  de: "Deutschland"
+setup.state.title:
+  en: "Federal state"
+  de: "Bundesland"
+setup.state.hint:
+  en: "Public holidays differ between the states."
+  de: "Die Feiertage unterscheiden sich je Bundesland."
+setup.summary.title:
+  en: "All set"
+  de: "Alles bereit"
+setup.summary.hint:
+  en: "Enter saves the settings to %{path} and opens the board."
+  de: "Enter speichert die Einstellungen in %{path} und öffnet das Board."
+setup.summary.language:
+  en: "Language"
+  de: "Sprache"
+setup.summary.dir:
+  en: "Directory"
+  de: "Verzeichnis"
+setup.summary.holidays:
+  en: "Holidays"
+  de: "Feiertage"
+setup.summary.later:
+  en: "You can change this any time with `shdo setup`."
+  de: "Ändern lässt sich das jederzeit mit `shdo setup`."
