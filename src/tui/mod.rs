@@ -51,6 +51,7 @@ fn run_in(
     let store = Store::new(cfg.data_dir(cli_dir.as_deref()));
     store.ensure_initialized()?;
     let mut app = App::new(store, cfg, cfg_path)?;
+    app.on_start();
     event_loop(terminal, &mut app)
 }
 

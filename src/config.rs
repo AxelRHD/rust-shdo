@@ -32,6 +32,10 @@ pub const DEFAULT_CONFIG: &str = r#"# shdo – settings for this machine (not sy
 # Show the calendar sidebar, also toggled with `c` in the board
 # show_calendar = true
 
+# Sync with the git remote when the board opens and before it closes
+# (never on every change); `s` syncs in between
+# auto_sync = false
+
 # Public holidays in the calendar: country-state, e.g. "de-bw"; empty = none
 # (states: bw, by, be, bb, hb, hh, he, mv, ni, nw, rp, sl, sn, st, sh, th)
 # holidays = "de-bw"
@@ -47,6 +51,7 @@ pub struct AppConfig {
     pub buckets: Vec<String>,
     pub show_done: Option<bool>,
     pub show_calendar: Option<bool>,
+    pub auto_sync: Option<bool>,
     pub holidays: Option<String>,
 }
 

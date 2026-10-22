@@ -4,6 +4,9 @@
 
 - Live search with `/` in titles, notes and IDs; works together with the bucket filter
   and the calendar counts, `Esc` clears it
+- Optional auto-sync (`auto_sync = true`): once when the board opens and once before it
+  closes if there is something to send, never on every change; a failed sync on quit
+  keeps the board open
 - Releases publish to crates.io via trusted publishing
 
 ## 0.1.0 - 2026-10-22

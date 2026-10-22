@@ -53,6 +53,21 @@ impl<'a> Git<'a> {
         self.run(&["init", "-q"]).map(|_| ())
     }
 
+    /// Is there anything to send: uncommitted changes or commits not pushed yet?
+    pub fn has_local_changes(&self) -> Result<bool> {
+        if !self.run(&["status", "--porcelain"])?.is_empty() {
+            return Ok(true);
+        }
+        let has_upstream = self
+            .run(&["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+            .is_ok();
+        if !has_upstream {
+            // Nothing tracked remotely yet: a push is needed once a remote exists
+            return Ok(!self.run(&["remote"])?.is_empty());
+        }
+        Ok(self.run(&["rev-list", "--count", "@{u}..HEAD"])? != "0")
+    }
+
     /// add, commit (if needed), pull --rebase, push. Returns a summary.
     pub fn sync(&self) -> Result<String> {
         if !self.is_repo() {
@@ -155,6 +170,35 @@ mod tests {
         let r = ga.sync().unwrap();
         assert!(r.contains("pulled"), "{r}");
         assert!(a.join("y.md").exists());
+    }
+
+    #[test]
+    fn local_changes() {
+        if !git_available() {
+            return;
+        }
+        let tmp = tempfile::tempdir().unwrap();
+        let remote = tmp.path().join("remote.git");
+        let a = tmp.path().join("a");
+        fs::create_dir_all(&a).unwrap();
+        Git::new(tmp.path(), true)
+            .run(&["init", "-q", "--bare", remote.to_str().unwrap()])
+            .unwrap();
+        let g = Git::new(&a, true);
+        g.init().unwrap();
+        configure(&a);
+        fs::write(a.join("x.md"), "eins").unwrap();
+        assert!(g.has_local_changes().unwrap());
+        g.sync().unwrap();
+        // committed, no remote: nothing to send
+        assert!(!g.has_local_changes().unwrap());
+        g.run(&["remote", "add", "origin", remote.to_str().unwrap()])
+            .unwrap();
+        assert!(g.has_local_changes().unwrap());
+        g.sync().unwrap();
+        assert!(!g.has_local_changes().unwrap());
+        fs::write(a.join("y.md"), "zwei").unwrap();
+        assert!(g.has_local_changes().unwrap());
     }
 
     #[test]

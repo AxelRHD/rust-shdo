@@ -141,6 +141,12 @@ pub struct App {
     fingerprint: u64,
     sync_rx: Option<Receiver<Result<String>>>,
     pub quit: bool,
+    /// Sync once on start and once on quit (config `auto_sync`).
+    auto_sync: bool,
+    /// Quit as soon as the running sync has finished successfully.
+    quit_after_sync: bool,
+    /// The sync on quit failed: the next quit leaves without syncing.
+    skip_sync_on_quit: bool,
     pub editor_request: Option<PathBuf>,
 }
 
@@ -165,6 +171,7 @@ impl App {
         };
         let show_done = cfg.show_done.unwrap_or(true);
         let show_calendar = cfg.show_calendar.unwrap_or(true);
+        let auto_sync = cfg.auto_sync.unwrap_or(false);
         let region = match Region::parse_setting(cfg.holidays.as_deref().unwrap_or("")) {
             Ok(r) => r,
             Err(value) => {
@@ -188,6 +195,9 @@ impl App {
             mode: Mode::Normal,
             show_done,
             show_calendar,
+            auto_sync,
+            quit_after_sync: false,
+            skip_sync_on_quit: false,
             region,
             status: None,
             themes,
@@ -307,9 +317,24 @@ impl App {
             self.sync_rx = None;
             let keep = self.selected_id();
             self.reload(keep);
+            let ok = res.is_ok();
             match res {
                 Ok(msg) => self.set_status(Level::Ok, format!("Sync: {msg}")),
                 Err(e) => self.set_status(Level::Error, format!("Sync: {e:#}")),
+            }
+            if self.quit_after_sync {
+                self.quit_after_sync = false;
+                if ok {
+                    // Changes made while a sync was running still need to go out
+                    self.request_quit();
+                } else {
+                    self.skip_sync_on_quit = true;
+                    if let Some((_, msg)) = &self.status {
+                        // Hint first: long git errors get cut off at the end of the line
+                        let msg = format!("{} – {msg}", t!("msg.quit_without_sync"));
+                        self.set_status(Level::Error, msg);
+                    }
+                }
             }
         }
         if matches!(
@@ -430,10 +455,10 @@ impl App {
         let shift = key.modifiers.contains(KeyModifiers::SHIFT);
         self.status = None;
         match key.code {
-            KeyCode::Char('q') => self.quit = true,
+            KeyCode::Char('q') => self.request_quit(),
             // Esc first clears an active search, then quits
             KeyCode::Esc if !self.filter.query.is_empty() => self.set_query(String::new()),
-            KeyCode::Esc => self.quit = true,
+            KeyCode::Esc => self.request_quit(),
             KeyCode::Char('/') => {
                 self.mode = Mode::Search {
                     input: Input::with(&self.filter.query),
@@ -669,6 +694,37 @@ impl App {
         if let Some(t) = self.selected() {
             self.editor_request = Some(t.path.clone());
         }
+    }
+
+    /// Called once when the board opens.
+    pub fn on_start(&mut self) {
+        if self.auto_sync {
+            self.start_sync();
+        }
+    }
+
+    /// Quit, with auto-sync first syncing pending changes. A failed sync keeps the board
+    /// open with the error; quitting again then leaves without syncing.
+    fn request_quit(&mut self) {
+        if !self.auto_sync || self.skip_sync_on_quit {
+            self.quit = true;
+            return;
+        }
+        if self.syncing() {
+            self.quit_after_sync = true;
+            self.set_status(Level::Info, t!("msg.sync_before_quit"));
+            return;
+        }
+        let pending = Git::new(&self.store.dir, true)
+            .has_local_changes()
+            .unwrap_or(true);
+        if !pending {
+            self.quit = true;
+            return;
+        }
+        self.start_sync();
+        self.quit_after_sync = true;
+        self.set_status(Level::Info, t!("msg.sync_before_quit"));
     }
 
     fn start_sync(&mut self) {

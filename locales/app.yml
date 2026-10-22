@@ -1009,3 +1009,9 @@ help.general.search:
 help.general.esc_search:
   en: "Esc clears an active search first"
   de: "Esc löscht zuerst eine aktive Suche"
+msg.sync_before_quit:
+  en: "syncing before quitting …"
+  de: "Sync vor dem Beenden …"
+msg.quit_without_sync:
+  en: "q quits without syncing"
+  de: "q beendet ohne Sync"

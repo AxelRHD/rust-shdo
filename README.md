@@ -169,7 +169,13 @@ buckets = ["work"]       # shown buckets; empty = all
 holidays = "de-bw"       # empty = none
 show_done = true
 show_calendar = true
+auto_sync = false        # sync when the board opens and before it closes
 ```
+
+With `auto_sync = true` the board syncs once in the background when it opens and once
+when you quit – only if there is something to send. It never syncs on every change;
+press `s` to sync in between. If the sync on quit fails, the board stays open with the
+error, and pressing `q` again quits without syncing.
 
 ### Themes
 
