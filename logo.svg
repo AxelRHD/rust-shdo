@@ -32,8 +32,7 @@
   <path d="M70 32 L73 34.5 L78 29.5" stroke="#a3be8c" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- Text -->
-  <!-- Two text elements instead of tspans: renders the same in every SVG viewer -->
-  <text x="102" y="43" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="30" font-weight="700" fill="#88c0d0">sh</text>
-  <text x="138" y="43" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="30" font-weight="700" fill="#eceff4">do</text>
+  <!-- One text element: "do" follows "sh" directly, whatever font the browser picks -->
+  <text x="102" y="43" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="30" font-weight="700"><tspan fill="#88c0d0">sh</tspan><tspan fill="#eceff4">do</tspan></text>
   <text x="104" y="54" font-family="system-ui, -apple-system, sans-serif" font-size="7.5" fill="#7b88a1" letter-spacing="0.4">kanban for your terminal</text>
 </svg>
