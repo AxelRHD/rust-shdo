@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="docs/demo.gif mit vhs aufnehmen (installiert vhs, ttyd und ffmpeg über mise)"
+#MISE description="docs/demo.gif und docs/setup.gif mit vhs aufnehmen (installiert vhs, ttyd und ffmpeg über mise)"
 #MISE tools={vhs="0.12.1", ttyd="1.7.7", ffmpeg="9.0.2"}
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
@@ -7,33 +7,50 @@ for tool in vhs ttyd ffmpeg; do
   command -v "$tool" >/dev/null || { echo "❌ $tool fehlt (mise install sollte es mitbringen)"; exit 1; }
 done
 cargo build -q --release
+bin="$MISE_PROJECT_ROOT/target/release/shdo"
 work="$MISE_PROJECT_ROOT/target/gif"
 rm -rf "$work"
-# A separate HOME for the recording, so the board header shows ~/.local/share/shdo
+
+# --- Board demo: its own HOME, so the header shows ~/.local/share/shdo ---------------
 export SHDO_GIF_HOME="$work/home"
 data="$SHDO_GIF_HOME/.local/share/shdo"
 mkdir -p "$work/bin" "$work/config" "$SHDO_GIF_HOME"
 export SHDO_CONFIG_DIR="$work/config"
 printf 'language = "en"\nholidays = "de-bw"\ntheme = "tokyonight"\n' > "$SHDO_CONFIG_DIR/config.toml"
 # Wrapper so the tape can just type `shdo`
-cat > "$work/bin/shdo" <<WRAP
-#!/usr/bin/env bash
-exec "$MISE_PROJECT_ROOT/target/release/shdo" --dir "$data" "\$@"
-WRAP
+printf '#!/usr/bin/env bash\nexec "%s" --dir "%s" "$@"\n' "$bin" "$data" > "$work/bin/shdo"
 chmod +x "$work/bin/shdo"
-export PATH="$work/bin:$PATH"
+export SHDO_GIF_BIN="$work/bin"
+shdo() { "$work/bin/shdo" "$@"; }
 
 shdo init >/dev/null
-printf '\n[[buckets]]\nkey = "home"\nname = "Home"\n\n[[buckets]]\nkey = "work"\nname = "Work"\n' >> "$data/shdo.toml"
+printf '\n[[buckets]]\nkey = "home"\n\n[[buckets]]\nkey = "work"\n' >> "$data/shdo.toml"
 shdo Pay electricity bill P1 due:tomorrow @home >/dev/null
-id=$(shdo Quarterly report P1 due:+4d @work | cut -d' ' -f1)
+id=$(shdo Quarterly report P1 due:+4d @work +reporting | cut -d' ' -f1)
 printf '\n- [x] collect numbers\n- [ ] write summary\n- [ ] send to team\n' >> "$data/tasks/$id.md"
+shdo Deploy release due:fri @work +ops +dev >/dev/null
 shdo Renew passport due:+1m @home >/dev/null
 shdo Fix bike light P3 @home >/dev/null
-id=$(shdo Review pull request due:today @work | cut -d' ' -f1); shdo mv "$id" doing >/dev/null
+id=$(shdo Review pull request due:today @work +dev | cut -d' ' -f1); shdo mv "$id" doing >/dev/null
 id=$(shdo Reply from landlord @home | cut -d' ' -f1); shdo mv "$id" wait >/dev/null
-id=$(shdo Send invoice @work | cut -d' ' -f1); shdo done "$id" >/dev/null
+# Done tasks of different ages: the one from a month ago is hidden by done_days = 14
+for spec in "Send invoice @work:2" "Book hotel @home:5" "Old quarterly report @work:30"; do
+  id=$(shdo "${spec%%:*}" | cut -d' ' -f1)
+  shdo done "$id" >/dev/null
+  when=$(date -d "-${spec##*:} days" +%Y-%m-%dT10:00:00%:z)
+  sed -i "s/^done = .*/done = $when/" "$data/tasks/$id.md"
+done
 
 echo "🎬 Nehme docs/demo.gif auf …"
 vhs docs/demo.tape
-echo "✅ docs/demo.gif ($(du -h docs/demo.gif | cut -f1))"
+
+# --- Setup: an empty HOME and config, as on a first start ----------------------------
+export SHDO_GIF_SETUP_HOME="$work/setup-home"
+mkdir -p "$work/setup-bin" "$SHDO_GIF_SETUP_HOME"
+printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$bin" > "$work/setup-bin/shdo"
+chmod +x "$work/setup-bin/shdo"
+export SHDO_GIF_SETUP_BIN="$work/setup-bin"
+echo "🎬 Nehme docs/setup.gif auf …"
+vhs docs/setup.tape
+
+echo "✅ docs/demo.gif ($(du -h docs/demo.gif | cut -f1)), docs/setup.gif ($(du -h docs/setup.gif | cut -f1))"

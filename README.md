@@ -12,7 +12,7 @@ screen and syncs between machines with plain git. No server, no database, no acc
 just files you can read, edit and diff.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/AxelRHD/rust-shdo/main/docs/demo.gif" alt="shdo demo: quick capture, moving a card, the task form, the bucket filter and the theme picker" width="900">
+  <img src="https://raw.githubusercontent.com/AxelRHD/rust-shdo/main/docs/demo.gif" alt="shdo demo: quick capture, moving a card, the task form, the tag filter, toggling calendar and done column, the settings page and the theme picker" width="900">
 </p>
 
 ## Why shdo?
@@ -76,7 +76,12 @@ Run `shdo`. On the first start a short setup asks for
 1. the language of the board (English or German),
 2. the data directory (default `~/.local/share/shdo`; an existing shdo directory is
    picked up as is),
-3. optionally public holidays for the calendar.
+3. whether to start with the buckets *home* and *work*,
+4. optionally public holidays for the calendar.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/AxelRHD/rust-shdo/main/docs/setup.gif" alt="shdo setup on the first start: language, data directory, buckets and holidays" width="900">
+</p>
 
 You can change this later with `shdo setup`. To sync between machines, add a remote to
 the data directory once:
