@@ -104,12 +104,11 @@ them.
 | `D`, `r`, `b`, `d` | due date, rename, bucket, delete |
 | `⏎` | details with notes |
 | `/` | search titles, notes and IDs (live; `Esc` clears) |
-| `f` | bucket filter; create, rename and delete buckets |
-| `+` | tag filter: show tasks with any of the checked tags |
+| `f` | filter by buckets and tags (`←`/`→` switches the tab); create, rename and delete buckets |
 | `v` / `c` | show or hide the done column / the calendar |
 | `s` | sync with the git remote |
 | `t` | choose a theme |
-| `,` | open the settings (config.toml) in your editor |
+| `,` | settings: language, default bucket, how long done tasks stay, auto-sync, holidays, archiving |
 | `q` | quit |
 
 ## Command line
@@ -127,7 +126,7 @@ shdo tag a3f dev ops                # set tags, "-" removes them
 shdo ls @work +dev                  # show only these, once
 shdo edit a3f                       # open the file in $EDITOR
 shdo sync                           # git add, commit, pull --rebase, push
-shdo archive                        # move done tasks to archive/
+shdo archive                        # archive done tasks older than done_days (--all: all)
 ```
 
 Dates for `due:` work in English and German: `2026-10-24`, `10/24`, `24.10.`, `+3d`,
@@ -173,6 +172,7 @@ editor = "hx"            # defaults to $VISUAL, then $EDITOR
 theme = "nord"
 buckets = ["work"]       # shown buckets; empty = all
 default_bucket = "work"  # bucket for new tasks when the filter does not decide
+done_days = 14           # show done tasks of the last 14 days; 0 = all
 tags = ["dev", "ops"]    # shown tags; empty = no tag filter
 holidays = "de-bw"       # empty = none
 show_done = true

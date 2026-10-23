@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Aktuellen Stand auf deinem echten Board starten, ohne zu installieren (Argumente gehen an shdo, z. B. mise run dev -- ls)"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT"
+cargo build -q
+exec ./target/debug/shdo "$@"

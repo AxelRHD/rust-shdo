@@ -29,6 +29,9 @@ pub const DEFAULT_CONFIG: &str = r#"# shdo – settings for this machine (not sy
 # Bucket for new tasks when neither @bucket nor the filter decides (key, e.g. "work")
 # default_bucket = "work"
 
+# Show done tasks of the last N days (0 = all); `shdo archive` archives older ones
+# done_days = 14
+
 # Shown tags (empty = no tag filter; a task matches if it has any), also set with `+`
 # tags = ["dev", "ops"]
 
@@ -59,6 +62,7 @@ pub struct AppConfig {
     pub show_calendar: Option<bool>,
     pub auto_sync: Option<bool>,
     pub default_bucket: Option<String>,
+    pub done_days: Option<u32>,
     #[serde(default)]
     pub tags: Vec<String>,
     pub holidays: Option<String>,
@@ -105,7 +109,18 @@ pub fn expand_tilde(p: &str) -> PathBuf {
     }
 }
 
+/// Default for `done_days`.
+pub const DONE_DAYS_DEFAULT: u32 = 14;
+
 impl AppConfig {
+    /// Days of done tasks to show; `None` = all (`done_days = 0`).
+    pub fn done_days(&self) -> Option<u32> {
+        match self.done_days.unwrap_or(DONE_DAYS_DEFAULT) {
+            0 => None,
+            n => Some(n),
+        }
+    }
+
     pub fn load(path: &Path) -> Result<AppConfig> {
         match fs::read_to_string(path) {
             Ok(raw) => toml::from_str(&raw)
@@ -158,6 +173,16 @@ pub fn ensure_file(path: &Path) -> Result<()> {
 /// Sets a string value in the config file; comments and other values are preserved.
 pub fn set_value(path: &Path, key: &str, val: &str) -> Result<()> {
     update(path, |doc| doc[key] = value(val))
+}
+
+pub fn set_int(path: &Path, key: &str, val: i64) -> Result<()> {
+    update(path, |doc| doc[key] = value(val))
+}
+
+pub fn remove_key(path: &Path, key: &str) -> Result<()> {
+    update(path, |doc| {
+        doc.remove(key);
+    })
 }
 
 pub fn set_bool(path: &Path, key: &str, val: bool) -> Result<()> {

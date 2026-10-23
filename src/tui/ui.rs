@@ -8,7 +8,7 @@ use ratatui::widgets::{Block, BorderType, Clear, Paragraph, Wrap};
 use rust_i18n::t;
 use unicode_width::UnicodeWidthStr;
 
-use super::app::{App, Level, Mode};
+use super::app::{App, Level, Mode, SETTINGS_ROWS, SettingsRow};
 use super::calendar;
 use super::form::{Field, Form, Input, prio_name};
 use crate::board::BucketOrigin;
@@ -74,7 +74,7 @@ const HELP: &[(&str, &[(&str, &str)])] = &[
         "help.tags",
         &[
             ("+tag", "help.tags.add"),
-            ("+", "help.tags.filter"),
+            ("f ←/→", "help.tags.filter"),
             ("Space / o / a", "help.tags.keys"),
             ("/+dev", "help.tags.search"),
         ],
@@ -146,6 +146,12 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::Filter { idx, checked, .. } => draw_filter(f, app, &c, *idx, checked),
         Mode::PickBucket { idx } => draw_pick_bucket(f, app, &c, *idx),
         Mode::TagFilter { idx, checked, .. } => draw_tag_filter(f, app, &c, *idx, checked),
+        Mode::Settings {
+            idx,
+            remote,
+            archivable,
+        } => draw_settings(f, app, &c, *idx, remote.as_deref(), *archivable),
+        Mode::ConfirmArchive { count, .. } => draw_confirm_archive(f, app, &c, *count),
         Mode::BucketNew {
             name,
             key,
@@ -171,8 +177,9 @@ fn draw_header(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
     if overdue > 0 {
         parts.push(t!("hdr.overdue", n = overdue).into_owned());
     }
-    if !app.show_done {
-        let last = &app.board.columns[app.board.last_index()];
+    let last = &app.board.columns[app.board.last_index()];
+    // Only worth mentioning if the hidden column actually holds something
+    if !app.show_done && !last.tasks.is_empty() {
         parts.push(
             t!(
                 "hdr.done_hidden",
@@ -281,15 +288,29 @@ fn draw_column(
         title.push(Span::styled("◂ ", Style::new().fg(c.dim)));
     }
     title.push(Span::styled(column.def.name.clone(), title_style));
+    // The done column says how far back it shows
+    if is_last && let Some(days) = app.board.filter.done_days {
+        title.push(Span::styled(
+            format!(" · {}", t!("col.done_days", n = days)),
+            Style::new().fg(c.dim),
+        ));
+    }
     let counter = if active && len > 0 {
         t!("col.position", n = row + 1, total = len).into_owned()
     } else {
         len.to_string()
     };
-    let mut bottom = vec![Span::styled(
+    let mut bottom = vec![];
+    if is_last && app.board.old_done > 0 {
+        bottom.push(Span::styled(
+            format!("{} · ", t!("col.older", n = app.board.old_done)),
+            Style::new().fg(c.dim),
+        ));
+    }
+    bottom.push(Span::styled(
         counter,
         Style::new().fg(if active { c.fg } else { c.dim }),
-    )];
+    ));
     if more_right {
         bottom.push(Span::styled(" ▸", Style::new().fg(c.dim)));
     }
@@ -559,7 +580,6 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
                     "kb.buckets"
                 },
             ));
-            k.push(("+", "kb.tags"));
             if has_buckets {
                 k.push(("b", "kb.bucket"));
             }
@@ -599,6 +619,7 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
             ("Esc", "kb.close"),
         ],
         Mode::Filter { .. } => vec![
+            ("←/→", "kb.tab"),
             ("j/k", "kb.select"),
             ("Space", "kb.toggle"),
             ("o", "kb.only"),
@@ -618,7 +639,15 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
         Mode::BucketDelete { .. } | Mode::BucketMove { .. } => {
             vec![("j/k", "kb.select"), ("⏎", "kb.run"), ("Esc", "kb.cancel")]
         }
+        Mode::Settings { .. } => vec![
+            ("j/k", "kb.select"),
+            ("←/→", "kb.change"),
+            ("⏎", "kb.run"),
+            ("Esc", "kb.close"),
+        ],
+        Mode::ConfirmArchive { .. } => vec![("y/j", "kb.archive"), ("n/Esc", "kb.cancel")],
         Mode::TagFilter { .. } => vec![
+            ("←/→", "kb.tab"),
             ("j/k", "kb.select"),
             ("Space", "kb.toggle"),
             ("o", "kb.only"),
@@ -1111,6 +1140,26 @@ fn title_hint(
     ])
 }
 
+/// Tab line of the filter popup: Buckets | Tags, switched with ←/→.
+fn filter_tabs(c: &Palette, tags_active: bool) -> Line<'static> {
+    let tab = |label: String, active: bool| {
+        if active {
+            Span::styled(
+                format!(" {label} "),
+                Style::new().fg(c.bg).bg(c.border_active).bold(),
+            )
+        } else {
+            Span::styled(format!(" {label} "), Style::new().fg(c.dim))
+        }
+    };
+    Line::from(vec![
+        Span::raw(" "),
+        tab(t!("filter.tab_buckets").into_owned(), !tags_active),
+        Span::styled(" │ ", Style::new().fg(c.dim)),
+        tab(t!("filter.tab_tags").into_owned(), tags_active),
+    ])
+}
+
 fn draw_filter(f: &mut Frame, app: &App, c: &Palette, idx: usize, checked: &[bool]) {
     let mut names: Vec<String> = app.board.buckets.iter().map(|b| b.name.clone()).collect();
     names.push(format!("({})", t!("bucket.none")));
@@ -1154,6 +1203,8 @@ fn draw_filter(f: &mut Frame, app: &App, c: &Palette, idx: usize, checked: &[boo
             )),
         );
     }
+    lines.insert(0, filter_tabs(c, false));
+    lines.insert(1, Line::default());
     let inner = popup(f, c, &t!("filter.title"), 42, lines.len() as u16 + 2);
     f.render_widget(Paragraph::new(lines), inner);
 }
@@ -1338,6 +1389,146 @@ fn draw_bucket_move(f: &mut Frame, app: &App, c: &Palette, key: &str, idx: usize
     f.render_widget(Paragraph::new(lines), inner);
 }
 
+/// Value shown for a settings row; `None` for action rows.
+fn setting_value(app: &App, row: SettingsRow) -> Option<String> {
+    let cfg = app.cfg();
+    Some(match row {
+        SettingsRow::Language => cfg.lang().native_name().to_string(),
+        SettingsRow::DefaultBucket => match cfg
+            .default_bucket
+            .as_deref()
+            .filter(|k| app.board.buckets.iter().any(|b| b.key == *k))
+        {
+            Some(k) => format!("{} @{k}", app.board.bucket_name(k)),
+            None => t!("settings.none").into_owned(),
+        },
+        SettingsRow::DoneDays => match cfg.done_days() {
+            Some(n) => t!("settings.days", n = n).into_owned(),
+            None => t!("settings.all").into_owned(),
+        },
+        SettingsRow::AutoSync => {
+            if cfg.auto_sync.unwrap_or(false) {
+                t!("settings.on").into_owned()
+            } else {
+                t!("settings.off").into_owned()
+            }
+        }
+        SettingsRow::Holidays => match app.region {
+            Some(_) => {
+                let code = cfg.holidays.as_deref().unwrap_or("").trim().to_lowercase();
+                let code = code.strip_prefix("de-").unwrap_or(&code).to_string();
+                crate::holidays::GERMAN_STATES
+                    .iter()
+                    .find(|(c, _, _)| *c == code)
+                    .map_or(code.clone(), |(_, _, name)| name.to_string())
+            }
+            None => t!("settings.none").into_owned(),
+        },
+        SettingsRow::Archive | SettingsRow::OpenFile => return None,
+    })
+}
+
+fn draw_settings(
+    f: &mut Frame,
+    app: &App,
+    c: &Palette,
+    idx: usize,
+    remote: Option<&str>,
+    archivable: usize,
+) {
+    let mut lines = vec![];
+    for (i, row) in SETTINGS_ROWS.iter().enumerate() {
+        let sel = i == idx;
+        let marker = Span::styled(
+            if sel { "→ " } else { "  " },
+            Style::new().fg(c.border_active),
+        );
+        let style = if sel {
+            Style::new().bold()
+        } else {
+            Style::new()
+        };
+        if *row == SettingsRow::Archive {
+            // Actions get a blank line above them
+            lines.push(Line::default());
+        }
+        let line = match setting_value(app, *row) {
+            Some(value) => {
+                let label = match row {
+                    SettingsRow::Language => t!("settings.language"),
+                    SettingsRow::DefaultBucket => t!("settings.default_bucket"),
+                    SettingsRow::DoneDays => t!("settings.done_days"),
+                    SettingsRow::AutoSync => t!("settings.auto_sync"),
+                    _ => t!("settings.holidays"),
+                };
+                let arrow = Style::new().fg(if sel { c.border_active } else { c.dim });
+                Line::from(vec![
+                    marker,
+                    Span::styled(format!("{:<20}", label), style),
+                    Span::styled("‹ ", arrow),
+                    Span::styled(value, Style::new().fg(c.fg)),
+                    Span::styled(" ›", arrow),
+                ])
+            }
+            None => {
+                let text = match (row, app.cfg().done_days()) {
+                    (SettingsRow::Archive, Some(d)) => {
+                        t!("settings.archive_older", n = d, count = archivable)
+                    }
+                    (SettingsRow::Archive, None) => t!("settings.archive_all", count = archivable),
+                    _ => t!("settings.open_file"),
+                };
+                Line::from(vec![marker, Span::styled(text.into_owned(), style)])
+            }
+        };
+        lines.push(line);
+    }
+    lines.push(Line::default());
+    let info = |label: String, value: String, dim: bool| {
+        Line::from(vec![
+            Span::styled(format!("  {label:<20}"), Style::new().fg(c.dim)),
+            Span::styled(value, Style::new().fg(if dim { c.dim } else { c.fg })),
+        ])
+    };
+    lines.push(info(
+        t!("settings.data_dir").into_owned(),
+        format!("{}  (shdo setup)", tilde_path(&app.store.dir)),
+        false,
+    ));
+    lines.push(match remote {
+        Some(url) => info(t!("settings.remote").into_owned(), url.to_string(), false),
+        None => info(
+            t!("settings.remote").into_owned(),
+            t!("settings.no_remote").into_owned(),
+            true,
+        ),
+    });
+    let inner = popup(f, c, &t!("settings.title"), 72, lines.len() as u16 + 2);
+    f.render_widget(Paragraph::new(lines), inner);
+}
+
+fn draw_confirm_archive(f: &mut Frame, app: &App, c: &Palette, count: usize) {
+    let text = match app.cfg().done_days() {
+        Some(d) => t!("settings.confirm_archive_older", n = d, count = count),
+        None => t!("settings.confirm_archive_all", count = count),
+    };
+    let inner = popup(f, c, &t!("settings.archive_title"), 56, 5);
+    let lines = vec![
+        Line::from(text.into_owned()),
+        Line::default(),
+        Line::from(vec![
+            Span::styled(
+                t!("kb.yes_key").into_owned(),
+                Style::new().fg(c.warn).bold(),
+            ),
+            Span::raw(format!(" {}   ", t!("kb.archive"))),
+            Span::styled("n", Style::new().fg(c.key)),
+            Span::raw(format!(" {}", t!("kb.cancel"))),
+        ]),
+    ];
+    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+}
+
 fn draw_tag_filter(f: &mut Frame, app: &App, c: &Palette, idx: usize, checked: &[bool]) {
     let mut lines: Vec<Line> = app
         .board
@@ -1378,7 +1569,9 @@ fn draw_tag_filter(f: &mut Frame, app: &App, c: &Palette, idx: usize, checked: &
         format!("  {hint}"),
         Style::new().fg(c.dim),
     )));
-    let inner = popup(f, c, &t!("tagfilter.title"), 42, lines.len() as u16 + 2);
+    lines.insert(0, filter_tabs(c, true));
+    lines.insert(1, Line::default());
+    let inner = popup(f, c, &t!("filter.title"), 42, lines.len() as u16 + 2);
     f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
 }
 

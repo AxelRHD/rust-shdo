@@ -78,8 +78,12 @@ enum Cmd {
     Edit { id: String },
     /// Sync with the git remote
     Sync,
-    /// Move done tasks to archive/
-    Archive,
+    /// Move done tasks older than `done_days` (default 14) to archive/
+    Archive {
+        /// Archive all done tasks, regardless of their age
+        #[arg(long)]
+        all: bool,
+    },
     /// Set up the data directory (including git init)
     Init,
     /// Run the setup dialog again (language, data directory, holidays)
@@ -128,8 +132,11 @@ fn run() -> Result<()> {
     let cfg_path = config::config_path();
     let cfg = AppConfig::load(&cfg_path)?;
     let store = Store::new(cfg.data_dir(cli.dir.as_deref()));
+    // The saved filter of this machine, as in the board
     let filter = Filter {
         buckets: cfg.buckets.clone(),
+        tags: task::normalize_tags(cfg.tags.iter().map(String::as_str)),
+        done_days: cfg.done_days(),
         ..Filter::default()
     };
     let all = Filter::all();
@@ -171,12 +178,17 @@ fn run() -> Result<()> {
         Cmd::Ls { all: true, .. } => ls(&store, &all),
         Cmd::Ls { filters, .. } if !filters.is_empty() => {
             // `@bucket` and `+tag` given on the command line replace the saved filter
-            let cfg = store.board_config()?;
-            let mut once = Filter::default();
+            let board_cfg = store.board_config()?;
+            let mut once = Filter {
+                done_days: filter.done_days,
+                ..Filter::default()
+            };
             for f in &filters {
                 match f.strip_prefix('+') {
                     Some(tag) => once.tags.extend(task::normalize_tags(std::iter::once(tag))),
-                    None => once.buckets.push(board::resolve_bucket(&cfg.buckets, f)?),
+                    None => once
+                        .buckets
+                        .push(board::resolve_bucket(&board_cfg.buckets, f)?),
                 }
             }
             ls(&store, &once)
@@ -242,17 +254,15 @@ fn run() -> Result<()> {
             println!("{}", git::Git::new(&store.dir, false).sync()?);
             Ok(())
         }
-        Cmd::Archive => {
-            let board = Board::load(&store, &all)?;
-            let last = &board.columns[board.last_index()];
-            for t in &last.tasks {
-                store.archive(t)?;
+        Cmd::Archive { all: everything } => {
+            let days = if everything { None } else { cfg.done_days() };
+            let (name, n) = board::archive_done(&store, days)?;
+            match days {
+                Some(d) => {
+                    println!("archived {n} task(s) from \"{name}\" done more than {d} days ago")
+                }
+                None => println!("archived {n} task(s) from \"{name}\""),
             }
-            println!(
-                "archived {} task(s) from \"{}\"",
-                last.tasks.len(),
-                last.def.name
-            );
             Ok(())
         }
         Cmd::Init => init(&store, cfg.lang()),

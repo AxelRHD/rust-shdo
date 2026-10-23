@@ -112,6 +112,7 @@ mod tests {
             "quickadd.",
             "setup.",
             "tagfilter.",
+            "settings.",
         ];
         let mut missing = vec![];
         let mut stack = vec![std::path::PathBuf::from(format!("{root}/src"))];

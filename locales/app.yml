@@ -519,8 +519,8 @@ help.buckets:
   en: "Buckets"
   de: "Buckets"
 help.buckets.filter:
-  en: "filter: which buckets are shown"
-  de: "Filter: welche Buckets angezeigt werden"
+  en: "filter: buckets and tags (←/→ switches the tab)"
+  de: "Filter: Buckets und Tags (←/→ wechselt den Reiter)"
 help.buckets.manage:
   en: "in the filter: create / rename / delete bucket"
   de: "im Filter: Bucket anlegen / umbenennen / löschen"
@@ -663,8 +663,8 @@ form.recognized:
   en: "recognized: %{parts}"
   de: "erkannt: %{parts}"
 filter.title:
-  en: "Filter · Buckets"
-  de: "Filter · Buckets"
+  en: "Filter"
+  de: "Filter"
 filter.no_buckets:
   en: "no buckets yet – n creates one"
   de: "noch keine Buckets – n legt einen an"
@@ -1019,8 +1019,8 @@ kb.settings:
   en: "settings"
   de: "Einstellungen"
 help.general.settings:
-  en: "open settings (config.toml) in the editor, applied on close"
-  de: "Einstellungen (config.toml) im Editor öffnen, beim Schließen übernommen"
+  en: "settings: language, default bucket, done days, auto-sync, holidays, archive"
+  de: "Einstellungen: Sprache, Standard-Bucket, Erledigte, Auto-Sync, Feiertage, Archiv"
 help.general.ctrl_c:
   en: "quit immediately, without auto-sync"
   de: "sofort beenden, ohne Auto-Sync"
@@ -1085,8 +1085,8 @@ help.tags.add:
   en: "in the title or the form: any number of tags per task"
   de: "im Titel oder im Formular: beliebig viele Tags je Task"
 help.tags.filter:
-  en: "tag filter: show tasks with any of the checked tags"
-  de: "Tag-Filter: Tasks mit einem der angekreuzten Tags zeigen"
+  en: "filter, Tags tab: tasks with any of the checked tags (+ jumps there)"
+  de: "Filter, Reiter Tags: Tasks mit einem der angekreuzten Tags (+ springt direkt hin)"
 help.tags.keys:
   en: "in the tag filter: on/off, only this, no tag filter"
   de: "im Tag-Filter: an/aus, nur dieser, kein Tag-Filter"
@@ -1099,15 +1099,99 @@ detail.tags:
 form.field.tags:
   en: "Tags"
   de: "Tags"
-msg.tag_filter:
-  en: "tag filter: %{label}"
-  de: "Tag-Filter: %{label}"
 tagfilter.title:
-  en: "Filter · Tags"
-  de: "Filter · Tags"
+  en: "Filter"
+  de: "Filter"
 tagfilter.hint:
   en: "nothing checked = all tasks"
   de: "nichts angekreuzt = alle Tasks"
 tagfilter.no_tags:
   en: "no tags yet – add +tag to a title"
   de: "noch keine Tags – +tag im Titel anlegen"
+settings.title:
+  en: "Settings"
+  de: "Einstellungen"
+settings.language:
+  en: "Language"
+  de: "Sprache"
+settings.default_bucket:
+  en: "Default bucket"
+  de: "Standard-Bucket"
+settings.done_days:
+  en: "Show done"
+  de: "Erledigte zeigen"
+settings.auto_sync:
+  en: "Auto-sync"
+  de: "Auto-Sync"
+settings.holidays:
+  en: "Holidays"
+  de: "Feiertage"
+settings.none:
+  en: "none"
+  de: "keine"
+settings.days:
+  en: "%{n} days"
+  de: "%{n} Tage"
+settings.all:
+  en: "all"
+  de: "alle"
+settings.on:
+  en: "on"
+  de: "an"
+settings.off:
+  en: "off"
+  de: "aus"
+settings.archive_older:
+  en: "Archive done tasks older than %{n} days (%{count})"
+  de: "Erledigte älter als %{n} Tage archivieren (%{count})"
+settings.archive_all:
+  en: "Archive all done tasks (%{count})"
+  de: "Alle Erledigten archivieren (%{count})"
+settings.open_file:
+  en: "Open settings file in the editor"
+  de: "Einstellungsdatei im Editor öffnen"
+settings.data_dir:
+  en: "Data directory"
+  de: "Datenverzeichnis"
+settings.remote:
+  en: "Git remote"
+  de: "Git-Remote"
+settings.no_remote:
+  en: "no remote – local only"
+  de: "kein Remote – nur lokal"
+settings.archive_title:
+  en: "Archive?"
+  de: "Archivieren?"
+settings.confirm_archive_older:
+  en: "Move %{count} done task(s) older than %{n} days to archive/? They stay in the repository."
+  de: "%{count} erledigte Task(s), älter als %{n} Tage, nach archive/ verschieben? Sie bleiben im Repo erhalten."
+settings.confirm_archive_all:
+  en: "Move all %{count} done task(s) to archive/? They stay in the repository."
+  de: "Alle %{count} erledigten Task(s) nach archive/ verschieben? Sie bleiben im Repo erhalten."
+kb.archive:
+  en: "archive"
+  de: "archivieren"
+msg.archived:
+  en: "%{n} task(s) archived"
+  de: "%{n} Task(s) archiviert"
+msg.not_archived:
+  en: "not archived"
+  de: "nicht archiviert"
+msg.nothing_to_archive:
+  en: "nothing to archive"
+  de: "nichts zu archivieren"
+col.done_days:
+  en: "%{n} days"
+  de: "%{n} Tage"
+col.older:
+  en: "+%{n} older"
+  de: "+%{n} älter"
+filter.tab_buckets:
+  en: "Buckets"
+  de: "Buckets"
+filter.tab_tags:
+  en: "Tags"
+  de: "Tags"
+kb.tab:
+  en: "buckets/tags"
+  de: "Buckets/Tags"

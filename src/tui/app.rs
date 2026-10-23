@@ -61,11 +61,23 @@ pub enum Mode {
         checked: Vec<bool>,
         original: Filter,
     },
+    /// Settings page; `remote` and `archivable` are looked up when it opens.
+    Settings {
+        idx: usize,
+        remote: Option<String>,
+        archivable: usize,
+    },
+    /// Confirm archiving from the settings page.
+    ConfirmArchive {
+        back: usize,
+        count: usize,
+    },
     /// Tag filter: entries are `board.tag_counts` in order.
     TagFilter {
         idx: usize,
         checked: Vec<bool>,
-        original: Vec<String>,
+        /// Filter when the popup opened; Esc restores buckets and tags.
+        original: Filter,
     },
     /// 0 = no bucket, otherwise index + 1.
     PickBucket {
@@ -120,6 +132,31 @@ enum Retarget {
     /// Archive all (done) tasks
     Archive,
 }
+
+/// Rows of the settings page, in display order.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum SettingsRow {
+    Language,
+    DefaultBucket,
+    DoneDays,
+    AutoSync,
+    Holidays,
+    Archive,
+    OpenFile,
+}
+
+pub const SETTINGS_ROWS: [SettingsRow; 7] = [
+    SettingsRow::Language,
+    SettingsRow::DefaultBucket,
+    SettingsRow::DoneDays,
+    SettingsRow::AutoSync,
+    SettingsRow::Holidays,
+    SettingsRow::Archive,
+    SettingsRow::OpenFile,
+];
+
+/// Choices for "show done tasks"; 0 = all.
+pub const DONE_DAYS_STEPS: [u32; 5] = [7, 14, 30, 90, 0];
 
 pub struct App {
     pub store: Store,
@@ -176,6 +213,7 @@ impl App {
         let filter = Filter {
             buckets: cfg.buckets.clone(),
             tags: crate::task::normalize_tags(cfg.tags.iter().map(String::as_str)),
+            done_days: cfg.done_days(),
             ..Filter::default()
         };
         let show_done = cfg.show_done.unwrap_or(true);
@@ -221,6 +259,142 @@ impl App {
 
     pub fn theme(&self) -> &Theme {
         &self.themes[self.theme]
+    }
+
+    pub fn cfg(&self) -> &AppConfig {
+        &self.cfg
+    }
+
+    /// Opens (or reopens) the settings page with the cursor on row `idx`.
+    pub fn open_settings(&mut self, idx: usize) {
+        let git = Git::new(&self.store.dir, true);
+        let remote = git
+            .run(&["remote"])
+            .ok()
+            .and_then(|r| r.lines().next().map(String::from))
+            .and_then(|name| git.run(&["remote", "get-url", &name]).ok());
+        let archivable = Board::load(&self.store, &Filter::all())
+            .map(|b| board::count_archivable(&b, self.cfg.done_days()))
+            .unwrap_or(0);
+        self.mode = Mode::Settings {
+            idx,
+            remote,
+            archivable,
+        };
+    }
+
+    fn settings_key(
+        &mut self,
+        key: KeyEvent,
+        idx: usize,
+        remote: Option<String>,
+        archivable: usize,
+    ) {
+        let n = SETTINGS_ROWS.len();
+        let row = SETTINGS_ROWS[idx];
+        let mut idx = idx;
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => idx = (idx + 1) % n,
+            KeyCode::Char('k') | KeyCode::Up => idx = (idx + n - 1) % n,
+            KeyCode::Esc | KeyCode::Char('q') => return,
+            KeyCode::Left | KeyCode::Char('h') => return self.change_setting(idx, row, -1),
+            KeyCode::Right | KeyCode::Char('l') | KeyCode::Char(' ') => {
+                return self.change_setting(idx, row, 1);
+            }
+            KeyCode::Enter => match row {
+                SettingsRow::Archive if archivable == 0 => {
+                    self.set_status(Level::Info, t!("msg.nothing_to_archive"))
+                }
+                SettingsRow::Archive => {
+                    self.mode = Mode::ConfirmArchive {
+                        back: idx,
+                        count: archivable,
+                    };
+                    return;
+                }
+                SettingsRow::OpenFile => {
+                    self.config_request = true;
+                    return;
+                }
+                _ => return self.change_setting(idx, row, 1),
+            },
+            _ => {}
+        }
+        self.mode = Mode::Settings {
+            idx,
+            remote,
+            archivable,
+        };
+    }
+
+    /// Steps a setting forward or back, writes config.toml and applies it.
+    fn change_setting(&mut self, idx: usize, row: SettingsRow, delta: isize) {
+        let path = self.cfg_path.clone();
+        let cycle =
+            |len: usize, cur: usize| ((cur as isize + delta).rem_euclid(len as isize)) as usize;
+        let res = match row {
+            SettingsRow::Language => {
+                let langs = crate::i18n::Lang::ALL;
+                let cur = langs
+                    .iter()
+                    .position(|l| *l == self.cfg.lang())
+                    .unwrap_or(0);
+                config::set_value(&path, "language", langs[cycle(langs.len(), cur)].code())
+            }
+            SettingsRow::DefaultBucket => {
+                // None first, then the buckets in shdo.toml order
+                let keys: Vec<Option<String>> = std::iter::once(None)
+                    .chain(self.board.buckets.iter().map(|b| Some(b.key.clone())))
+                    .collect();
+                let cur = keys
+                    .iter()
+                    .position(|k| *k == self.cfg.default_bucket)
+                    .unwrap_or(0);
+                match &keys[cycle(keys.len(), cur)] {
+                    Some(k) => config::set_value(&path, "default_bucket", k),
+                    None => config::remove_key(&path, "default_bucket"),
+                }
+            }
+            SettingsRow::DoneDays => {
+                let cur_days = self.cfg.done_days().unwrap_or(0);
+                let cur = DONE_DAYS_STEPS
+                    .iter()
+                    .position(|d| *d == cur_days)
+                    .unwrap_or(1);
+                let next = DONE_DAYS_STEPS[cycle(DONE_DAYS_STEPS.len(), cur)];
+                config::set_int(&path, "done_days", i64::from(next))
+            }
+            SettingsRow::AutoSync => {
+                config::set_bool(&path, "auto_sync", !self.cfg.auto_sync.unwrap_or(false))
+            }
+            SettingsRow::Holidays => {
+                let states = crate::holidays::GERMAN_STATES;
+                let cur = self
+                    .cfg
+                    .holidays
+                    .as_deref()
+                    .and_then(|h| {
+                        let code = h.trim().to_lowercase();
+                        let code = code.strip_prefix("de-").unwrap_or(&code).to_string();
+                        states.iter().position(|(c, _, _)| *c == code)
+                    })
+                    .map_or(0, |i| i + 1);
+                match cycle(states.len() + 1, cur).checked_sub(1) {
+                    Some(i) => config::set_value(
+                        &path,
+                        "holidays",
+                        &crate::holidays::Region::setting_for_state(states[i].0),
+                    ),
+                    None => config::remove_key(&path, "holidays"),
+                }
+            }
+            SettingsRow::Archive | SettingsRow::OpenFile => Ok(()),
+        };
+        match res {
+            Ok(()) => self.reload_config(),
+            Err(e) => self.set_status(Level::Error, format!("{e:#}")),
+        }
+        self.open_settings(idx);
     }
 
     pub fn cfg_path(&self) -> &std::path::Path {
@@ -480,6 +654,25 @@ impl App {
                 original,
             } => self.filter_key(key, idx, checked, original),
             Mode::PickBucket { idx } => self.pick_bucket_key(key, idx),
+            Mode::Settings {
+                idx,
+                remote,
+                archivable,
+            } => self.settings_key(key, idx, remote, archivable),
+            Mode::ConfirmArchive { back, count } => {
+                if matches!(key.code, KeyCode::Char('j' | 'J' | 'y' | 'Y')) {
+                    let res = board::archive_done(&self.store, self.cfg.done_days());
+                    let keep = self.selected_id();
+                    self.reload(keep);
+                    match res {
+                        Ok((_, n)) => self.set_status(Level::Ok, t!("msg.archived", n = n)),
+                        Err(e) => self.set_status(Level::Error, format!("{e:#}")),
+                    }
+                } else {
+                    self.set_status(Level::Info, t!("msg.not_archived", n = count));
+                }
+                self.open_settings(back);
+            }
             Mode::TagFilter {
                 idx,
                 checked,
@@ -567,7 +760,7 @@ impl App {
                 }
             }
             KeyCode::Char('f') => self.open_filter(),
-            KeyCode::Char('+') => self.open_tag_filter(),
+            KeyCode::Char('+') => self.open_tag_tab(self.filter.clone()),
             KeyCode::Char('v') => self.toggle_show_done(),
             KeyCode::Char('c') => self.toggle_calendar(),
             KeyCode::Char('b') => self.open_pick_bucket(),
@@ -584,7 +777,7 @@ impl App {
                 }
             }
             KeyCode::Char('?') => self.mode = Mode::Help { scroll: 0 },
-            KeyCode::Char(',') => self.config_request = true,
+            KeyCode::Char(',') => self.open_settings(0),
             _ => {}
         }
     }
@@ -840,6 +1033,38 @@ impl App {
         };
     }
 
+    /// Switches the filter popup to the bucket tab, keeping the original for Esc.
+    fn open_bucket_tab(&mut self, original: Filter) {
+        self.open_filter_at(0);
+        if let Mode::Filter { original: o, .. } = &mut self.mode {
+            *o = original;
+        }
+    }
+
+    /// Saves buckets and tags of the filter popup in config.toml.
+    fn save_filter(&mut self) {
+        let buckets = self.board.filter.buckets.clone();
+        let tags = self.filter.tags.clone();
+        let res = config::set_list(&self.cfg_path, "buckets", &buckets)
+            .and_then(|()| config::set_list(&self.cfg_path, "tags", &tags));
+        let label = [self.board.filter_label(), self.board.tag_label()]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        let label = if label.is_empty() {
+            t!("msg.all").into_owned()
+        } else {
+            label.join(" · ")
+        };
+        self.report(res, t!("msg.filter", label = label));
+    }
+
+    /// Esc in the filter popup: back to how it was when the popup opened.
+    fn restore_filter(&mut self, original: Filter) {
+        self.filter.tags = original.tags.clone();
+        self.apply_filter(original);
+    }
+
     fn filter_from(&self, checked: &[bool]) -> Filter {
         let n = self.board.buckets.len();
         let buckets = checked
@@ -885,7 +1110,8 @@ impl App {
         self.reload(keep);
     }
 
-    fn open_tag_filter(&mut self) {
+    /// The tag tab of the filter popup.
+    fn open_tag_tab(&mut self, original: Filter) {
         let checked = self
             .board
             .tag_counts
@@ -895,7 +1121,7 @@ impl App {
         self.mode = Mode::TagFilter {
             idx: 0,
             checked,
-            original: self.filter.tags.clone(),
+            original,
         };
     }
 
@@ -921,7 +1147,7 @@ impl App {
         key: KeyEvent,
         idx: usize,
         mut checked: Vec<bool>,
-        original: Vec<String>,
+        original: Filter,
     ) {
         let n = checked.len().max(1);
         let mut idx = idx;
@@ -946,21 +1172,11 @@ impl App {
                 checked.iter_mut().for_each(|c| *c = false);
                 self.set_tag_filter(Vec::new());
             }
-            KeyCode::Enter => {
-                let tags = self.checked_tags(&checked);
-                self.set_tag_filter(tags.clone());
-                let res = config::set_list(&self.cfg_path, "tags", &tags);
-                let label = self
-                    .board
-                    .tag_label()
-                    .unwrap_or_else(|| t!("msg.all").into_owned());
-                self.report(res, t!("msg.tag_filter", label = label));
-                return;
+            KeyCode::Left | KeyCode::Right | KeyCode::Char('h') | KeyCode::Char('l') => {
+                return self.open_bucket_tab(original);
             }
-            KeyCode::Esc | KeyCode::Char('q') => {
-                self.set_tag_filter(original);
-                return;
-            }
+            KeyCode::Enter => return self.save_filter(),
+            KeyCode::Esc | KeyCode::Char('q') => return self.restore_filter(original),
             _ => {}
         }
         self.mode = Mode::TagFilter {
@@ -999,25 +1215,19 @@ impl App {
                 let f = self.filter_from(&checked);
                 self.apply_filter(f);
             }
+            KeyCode::Left | KeyCode::Right | KeyCode::Char('h') | KeyCode::Char('l') => {
+                return self.open_tag_tab(original);
+            }
             KeyCode::Enter => {
                 let f = if checked.iter().any(|&c| c) {
                     self.filter_from(&checked)
                 } else {
                     Filter::all()
                 };
-                self.apply_filter(f.clone());
-                let res = config::set_list(&self.cfg_path, "buckets", &f.buckets);
-                let label = self
-                    .board
-                    .filter_label()
-                    .unwrap_or_else(|| t!("msg.all").into_owned());
-                self.report(res, t!("msg.filter", label = label));
-                return;
+                self.apply_filter(f);
+                return self.save_filter();
             }
-            KeyCode::Esc | KeyCode::Char('q') => {
-                self.apply_filter(original);
-                return;
-            }
+            KeyCode::Esc | KeyCode::Char('q') => return self.restore_filter(original),
             KeyCode::Char('n') => {
                 self.mode = Mode::BucketNew {
                     name: Input::default(),

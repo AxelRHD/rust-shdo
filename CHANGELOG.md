@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 - 2026-10-23
+
+- Settings page on `,`: language, default bucket, how long done tasks stay visible,
+  auto-sync and holidays, changed with `←`/`→` and applied at once; it also archives
+  old done tasks, opens the settings file and shows the data directory and git remote
+- Done tasks are shown for 14 days (`done_days`, 7/14/30/90 or all); the done column
+  says so and counts the older ones it hides. Open tasks are never hidden by age
+- `shdo archive` now archives done tasks older than `done_days`; `--all` archives all
+- The tag filter moved into the filter popup (`f`): `←`/`→` switches between buckets
+  and tags, Enter saves both, Esc restores both; `+` still jumps to the tags
+- The header no longer mentions a hidden done column when it is empty
+
 ## 0.4.0 - 2026-10-23
 
 - Tags: `+dev` in the title or the form's tag field, any number per task, stored as

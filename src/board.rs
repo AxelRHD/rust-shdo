@@ -20,6 +20,8 @@ pub struct Filter {
     pub query: String,
     /// Shown tags: a task matches if it has any of them. Empty = no tag filter.
     pub tags: Vec<String>,
+    /// Done tasks older than this many days are not shown; `None` = show all.
+    pub done_days: Option<u32>,
 }
 
 impl Filter {
@@ -99,6 +101,8 @@ pub struct Board {
     pub tag_counts: Vec<(String, usize)>,
     /// Open tasks hidden by the filter.
     pub hidden: usize,
+    /// Done tasks (matching the filter) hidden because they are older than `done_days`.
+    pub old_done: usize,
     pub warnings: Vec<String>,
 }
 
@@ -118,6 +122,8 @@ impl Board {
         filter: Filter,
     ) -> Board {
         let filter = filter.normalized(&cfg.buckets);
+        let today = crate::dates::today();
+        let mut old_done = 0;
         let mut columns: Vec<Column> = cfg
             .statuses
             .into_iter()
@@ -169,6 +175,10 @@ impl Board {
                 }
                 continue;
             }
+            if idx == last && is_old_done(&task, filter.done_days, today) {
+                old_done += 1;
+                continue;
+            }
             columns[idx].tasks.push(task);
         }
         for (i, col) in columns.iter_mut().enumerate() {
@@ -181,6 +191,7 @@ impl Board {
             bucket_counts,
             tag_counts: tag_counts.into_iter().collect(),
             hidden,
+            old_done,
             warnings,
         }
     }
@@ -262,6 +273,45 @@ pub enum BucketOrigin {
     Filter,
     /// `default_bucket` in config.toml
     Default,
+}
+
+/// A done task whose completion (or, without `done`, the file's mtime) lies more than
+/// `days` days before `today`. `None` never counts as old.
+pub fn is_old_done(task: &Task, days: Option<u32>, today: jiff::civil::Date) -> bool {
+    let (Some(days), Some(at)) = (days, task.done.or(task.mtime)) else {
+        return false;
+    };
+    let done_on = crate::dates::local_date(at);
+    done_on
+        .until(today)
+        .map(|span| span.get_days() as i64 > i64::from(days))
+        .unwrap_or(false)
+}
+
+/// Archives done tasks older than `days` (`None` = all done tasks), across all buckets
+/// and tags. Returns the done column's name and the number archived.
+pub fn archive_done(store: &Store, days: Option<u32>) -> Result<(String, usize)> {
+    let board = Board::load(store, &Filter::all())?;
+    let done = &board.columns[board.last_index()];
+    let today = crate::dates::today();
+    let mut n = 0;
+    for task in &done.tasks {
+        if days.is_none() || is_old_done(task, days, today) {
+            store.archive(task)?;
+            n += 1;
+        }
+    }
+    Ok((done.def.name.clone(), n))
+}
+
+/// How many done tasks `archive_done` would archive.
+pub fn count_archivable(board_all: &Board, days: Option<u32>) -> usize {
+    let today = crate::dates::today();
+    board_all.columns[board_all.last_index()]
+        .tasks
+        .iter()
+        .filter(|t| days.is_none() || is_old_done(t, days, today))
+        .count()
 }
 
 /// Bucket for a new task: `@…` in the title, else the filter (exactly one bucket shown),
@@ -450,6 +500,37 @@ mod tests {
 
     fn bucket_task(id: &str, bucket: &str) -> Task {
         task(id, &format!("bucket = \"{bucket}\""))
+    }
+
+    #[test]
+    fn old_done_tasks_are_hidden() {
+        let today = crate::dates::today();
+        let at = |days_ago: i64| {
+            let d = today.checked_sub(jiff::ToSpan::days(days_ago)).unwrap();
+            format!("done = {d}T12:00:00Z")
+        };
+        let mut recent = task("recent", &at(3));
+        recent.status = "done".into();
+        let mut old = task("old", &at(20));
+        old.status = "done".into();
+        let open_old = task("open", &at(20));
+        assert!(is_old_done(&old, Some(14), today));
+        assert!(!is_old_done(&recent, Some(14), today));
+        assert!(!is_old_done(&old, None, today));
+        let cfg = parse_board("").unwrap();
+        let tasks = || vec![recent.clone(), old.clone(), open_old.clone()];
+        let f = Filter {
+            done_days: Some(14),
+            ..Filter::default()
+        };
+        let b = Board::build(cfg.clone(), tasks(), vec![], f);
+        assert_eq!(ids(&b.columns[3].tasks), ["recent"]);
+        assert_eq!(b.old_done, 1);
+        // open tasks are never hidden by age
+        assert_eq!(ids(&b.columns[0].tasks), ["open"]);
+        let b = Board::build(cfg, tasks(), vec![], Filter::all());
+        assert_eq!(b.columns[3].tasks.len(), 2);
+        assert_eq!(b.old_done, 0);
     }
 
     #[test]
