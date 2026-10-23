@@ -26,8 +26,8 @@ just files you can read, edit and diff.
 - **Sync without conflicts.** Tasks live in a git repository; `s` (or `shdo sync`)
   commits, pulls and pushes. One file per task means merge conflicts practically never
   happen.
-- **Deliberately small.** Statuses, priorities, due dates, buckets and notes. No
-  assignees, projects, tags or story points.
+- **Deliberately small.** Statuses, priorities, due dates, buckets, tags and notes. No
+  assignees, projects or story points.
 
 ## Features
 
@@ -39,6 +39,8 @@ just files you can read, edit and diff.
 - **Tags** such as `+dev`, `+ops` across buckets, with their own filter
 - **Calendar sidebar** with the number of tasks due per day and public holidays
   (Germany, all federal states)
+- Settings page (`,`) for language, default bucket, auto-sync, holidays and how long
+  done tasks stay on the board (14 days by default; `shdo archive` moves older ones away)
 - Markdown notes with checklists (`☐ 1/3` on the card)
 - 7 built-in themes – Tokyo Night, Nord, Gruvbox Dark/Light, Catppuccin Mocha/Latte,
   Terminal – plus your own
