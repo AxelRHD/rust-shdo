@@ -383,6 +383,9 @@ kb.next_field:
 kb.prev_field:
   en: "previous"
   de: "voriges"
+kb.complete:
+  en: "complete"
+  de: "vervollständigen"
 kb.change:
   en: "change"
   de: "ändern"
@@ -515,6 +518,9 @@ help.form.discard:
 help.form.tokens:
   en: "in the title: P1–P3, due:fri, @work"
   de: "im Titel: P1–P3, due:fr, @work"
+help.form.complete:
+  en: "take over the suggested tag or bucket (grey)"
+  de: "vorgeschlagenen Tag oder Bucket übernehmen (grau)"
 help.buckets:
   en: "Buckets"
   de: "Buckets"

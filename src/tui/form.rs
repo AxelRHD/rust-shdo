@@ -97,6 +97,13 @@ pub fn prio_name(prio: u8) -> String {
     t!(key).into_owned()
 }
 
+/// Tags of all tasks, most used (open tasks) first, then by name.
+fn known_tags(board: &Board) -> Vec<String> {
+    let mut tags = board.tag_counts.clone();
+    tags.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    tags.into_iter().map(|(tag, _)| tag).collect()
+}
+
 pub struct Form {
     /// `None` = new task, otherwise the ID of the edited task.
     pub editing: Option<String>,
@@ -118,6 +125,8 @@ pub struct Form {
     pub note: Input,
     /// Multi-line notes can only be edited in the editor.
     pub note_editable: bool,
+    /// Known tags, most used first – suggested while typing a tag.
+    pub tag_names: Vec<String>,
 }
 
 impl Form {
@@ -144,6 +153,7 @@ impl Form {
             tags: Input::default(),
             note: Input::default(),
             note_editable: true,
+            tag_names: known_tags(board),
         }
     }
 
@@ -216,6 +226,58 @@ impl Form {
         }
     }
 
+    /// The rest of a known tag (or, in the title, a bucket after `@`) for the word that
+    /// ends at the cursor – shown greyed out and taken over with `→`.
+    pub fn suggestion(&self) -> Option<&str> {
+        let (input, in_title) = match self.focused() {
+            Field::Title => (&self.title, true),
+            Field::Tags => (&self.tags, false),
+            _ => return None,
+        };
+        let (before, after) = input.text.split_at(input.byte_pos(input.cursor));
+        if after.chars().next().is_some_and(|c| !c.is_whitespace()) {
+            return None;
+        }
+        let word = before.rsplit(char::is_whitespace).next().unwrap_or("");
+        let (prefix, candidates) = match (in_title, word.chars().next()) {
+            (true, Some('+')) | (false, Some('+')) => (&word[1..], &self.tag_names),
+            (true, Some('@')) => (&word[1..], &self.bucket_keys),
+            (false, Some(_)) => (word, &self.tag_names),
+            _ => return None,
+        };
+        if prefix.is_empty() {
+            return None;
+        }
+        let words: Vec<&str> = input.text.split_whitespace().collect();
+        let prefix = prefix.to_lowercase();
+        candidates
+            .iter()
+            .filter(|c| c.len() > prefix.len() && c.starts_with(&prefix))
+            // a tag that is already there is not suggested again
+            .find(|c| {
+                !words
+                    .iter()
+                    .any(|w| w.trim_start_matches('+') == c.as_str())
+            })
+            .map(|c| &c[prefix.len()..])
+    }
+
+    fn accept_suggestion(&mut self) -> bool {
+        let Some(rest) = self.suggestion().map(str::to_owned) else {
+            return false;
+        };
+        let Some(input) = self.input_mut() else {
+            return false;
+        };
+        let at = input.byte_pos(input.cursor);
+        let space = !input.text[at..].starts_with(' ');
+        input
+            .text
+            .insert_str(at, &format!("{rest}{}", if space { " " } else { "" }));
+        input.cursor += rest.chars().count() + 1;
+        true
+    }
+
     fn cycle(&mut self, delta: isize) {
         let wrap = |v: usize, n: usize| ((v as isize + delta).rem_euclid(n as isize)) as usize;
         match self.focused() {
@@ -235,6 +297,7 @@ impl Form {
         match key.code {
             KeyCode::Tab | KeyCode::Down => self.focus = (self.focus + 1) % n,
             KeyCode::BackTab | KeyCode::Up => self.focus = (self.focus + n - 1) % n,
+            KeyCode::Right if self.accept_suggestion() => {}
             _ if self.focused().is_text() => {
                 if let Some(input) = self.input_mut() {
                     input.handle(key);
@@ -285,6 +348,47 @@ mod tests {
         let f = Form::new_task(&board(&["work", "home"]), 0, Some("home"));
         assert_eq!(f.bucket_key(), Some("home"));
         assert_eq!(f.origin, Some(BucketOrigin::Default));
+    }
+
+    fn typed(f: &mut Form, text: &str) {
+        for ch in text.chars() {
+            f.handle(key(KeyCode::Char(ch)));
+        }
+    }
+
+    #[test]
+    fn suggests_known_tags_and_buckets() {
+        let mut f = Form::new_task(&board(&[]), 0, None);
+        f.tag_names = vec!["reporting".into(), "dev".into(), "deploy".into()];
+        typed(&mut f, "Report +rep");
+        assert_eq!(f.suggestion(), Some("orting"));
+        f.handle(key(KeyCode::Right));
+        assert_eq!(f.title.text, "Report +reporting ");
+        assert_eq!(f.suggestion(), None);
+        // most used first, already used tags are skipped
+        typed(&mut f, "+de");
+        assert_eq!(f.suggestion(), Some("v"));
+        typed(&mut f, "v +d");
+        assert_eq!(f.suggestion(), Some("eploy"));
+        // buckets after @ in the title
+        typed(&mut f, " @wo");
+        assert_eq!(f.suggestion(), Some("rk"));
+        // nothing for plain words, a complete tag or the cursor inside a word
+        typed(&mut f, "rk");
+        assert_eq!(f.suggestion(), None);
+        f.handle(key(KeyCode::Left));
+        assert_eq!(f.suggestion(), None);
+        // without a suggestion → still moves the cursor
+        f.handle(key(KeyCode::Right));
+        assert_eq!(f.title.cursor, f.title.text.chars().count());
+        // tags field: + is optional
+        while f.focused() != Field::Tags {
+            f.handle(key(KeyCode::Tab));
+        }
+        typed(&mut f, "dev re");
+        assert_eq!(f.suggestion(), Some("porting"));
+        f.handle(key(KeyCode::Right));
+        assert_eq!(f.tags.text, "dev reporting ");
     }
 
     #[test]

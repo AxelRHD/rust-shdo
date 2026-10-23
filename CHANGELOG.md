@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The form suggests known tags while you type one (`+rep` → `+reporting`, also in the
+  tags field) and buckets after `@` in the title; `→` takes the grey suggestion over.
+  Most used tags come first, tags already in the field are not suggested again
+
 ## 0.5.0 - 2026-10-23
 
 - Settings page on `,`: language, default bucket, how long done tasks stay visible,

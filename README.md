@@ -33,7 +33,8 @@ just files you can read, edit and diff.
 
 - Kanban columns per status (Todo, Doing, Waiting, Done – configurable), sorted
   automatically by priority, due date and age
-- Form for new and edited tasks with a live preview of recognized dates
+- Form for new and edited tasks with a live preview of recognized dates,
+  and suggestions for known tags and buckets while you type (`→` takes them over)
 - **Buckets** such as *home* and *work*, with a per-machine filter: show work tasks on
   the work laptop and home tasks at home, from the same repository
 - **Tags** such as `+dev`, `+ops` across buckets, with their own filter

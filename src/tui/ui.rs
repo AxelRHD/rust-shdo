@@ -56,6 +56,7 @@ const HELP: &[(&str, &[(&str, &str)])] = &[
             ("⏎", "help.form.save"),
             ("Esc", "help.form.discard"),
             ("P1 due: @", "help.form.tokens"),
+            ("→", "help.form.complete"),
         ],
     ),
     (
@@ -601,6 +602,8 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
             let mut k = vec![("Tab/↓", "kb.next_field"), ("⇧Tab/↑", "kb.prev_field")];
             if !form.focused().is_text() {
                 k.push(("←/→", "kb.change"));
+            } else if form.suggestion().is_some() {
+                k.push(("→", "kb.complete"));
             }
             k.extend([("⏎", "kb.save"), ("Esc", "kb.discard")]);
             k
@@ -926,6 +929,48 @@ pub(super) fn input_view(input: &Input, width: usize) -> (String, usize) {
     (out, cursor_w(start))
 }
 
+/// Like [`input_view`], with `ghost` shown greyed out at the cursor (a suggestion).
+fn input_spans(
+    input: &Input,
+    ghost: Option<&str>,
+    width: usize,
+    c: &Palette,
+) -> (Vec<Span<'static>>, usize) {
+    let Some(ghost) = ghost else {
+        let (visible, cx) = input_view(input, width);
+        return (vec![Span::styled(visible, Style::new().fg(c.fg))], cx);
+    };
+    let at = input
+        .text
+        .char_indices()
+        .nth(input.cursor)
+        .map_or(input.text.len(), |(i, _)| i);
+    let mut joined = input.text.clone();
+    joined.insert_str(at, ghost);
+    let shown = Input {
+        text: joined,
+        cursor: input.cursor,
+    };
+    let (visible, cx) = input_view(&shown, width);
+    // `visible` starts where the cursor still fits; find the ghost inside it
+    let mut spans = vec![];
+    let (mut w, mut part, mut in_ghost) = (0, String::new(), false);
+    let ghost_w = unicode_width::UnicodeWidthStr::width(ghost);
+    for ch in visible.chars() {
+        let now_ghost = w >= cx && w < cx + ghost_w;
+        if now_ghost != in_ghost && !part.is_empty() {
+            let fg = if in_ghost { c.dim } else { c.fg };
+            spans.push(Span::styled(std::mem::take(&mut part), Style::new().fg(fg)));
+        }
+        in_ghost = now_ghost;
+        part.push(ch);
+        w += unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+    }
+    let fg = if in_ghost { c.dim } else { c.fg };
+    spans.push(Span::styled(part, Style::new().fg(fg)));
+    (spans, cx)
+}
+
 fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
     const LABEL: usize = 10;
     let today = dates::today();
@@ -969,9 +1014,10 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
         ];
         let y = inner.y + lines.len() as u16;
         let x0 = inner.x + (LABEL + 2) as u16;
+        let ghost = if focused { form.suggestion() } else { None };
         let mut text_field = |input: &Input, spans: &mut Vec<Span<'static>>, width: usize| {
-            let (visible, cx) = input_view(input, width);
-            spans.push(Span::styled(visible, Style::new().fg(c.fg)));
+            let (parts, cx) = input_spans(input, ghost, width, c);
+            spans.extend(parts);
             if focused {
                 cursor = Some(Position {
                     x: x0 + cx as u16,
