@@ -226,11 +226,11 @@ pub fn run(
     let new_board = setup.new_board();
     config::write_setup(cfg_path, &result)?;
     let store = setup.store();
-    store.init(result.language)?;
+    store.init()?;
     if new_board && setup.buckets == 0 {
-        let l = result.language.code();
-        store.add_bucket("home", &t!("board.default.home", locale = l))?;
-        store.add_bucket("work", &t!("board.default.work", locale = l))?;
+        // Without names: shown as Home/Work or Privat/Arbeit, following the language
+        store.add_bucket("home", "")?;
+        store.add_bucket("work", "")?;
     }
     let git = crate::git::Git::new(&store.dir, true);
     if !git.is_repo() {
@@ -474,7 +474,7 @@ mod tests {
     #[test]
     fn existing_board_skips_the_bucket_step() {
         let tmp = tempfile::tempdir().unwrap();
-        Store::new(tmp.path().to_path_buf()).init(Lang::En).unwrap();
+        Store::new(tmp.path().to_path_buf()).init().unwrap();
         let mut s = Setup::new(&cfg("en"), Some(tmp.path()));
         s.step = Step::Dir;
         s.handle(key(KeyCode::Enter));

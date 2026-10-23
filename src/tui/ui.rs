@@ -1424,7 +1424,7 @@ fn setting_value(app: &App, row: SettingsRow) -> Option<String> {
             }
             None => t!("settings.none").into_owned(),
         },
-        SettingsRow::Archive | SettingsRow::OpenFile => return None,
+        SettingsRow::Archive | SettingsRow::EditBoard | SettingsRow::OpenFile => return None,
     })
 }
 
@@ -1476,6 +1476,7 @@ fn draw_settings(
                         t!("settings.archive_older", n = d, count = archivable)
                     }
                     (SettingsRow::Archive, None) => t!("settings.archive_all", count = archivable),
+                    (SettingsRow::EditBoard, _) => t!("settings.edit_board"),
                     _ => t!("settings.open_file"),
                 };
                 Line::from(vec![marker, Span::styled(text.into_owned(), style)])

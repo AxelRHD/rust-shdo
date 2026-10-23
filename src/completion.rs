@@ -222,13 +222,13 @@ mod tests {
     fn candidates_from_store() {
         let tmp = tempfile::tempdir().unwrap();
         let store = Store::new(tmp.path().to_path_buf());
-        store.init(crate::i18n::Lang::De).unwrap();
+        store.init().unwrap();
         let t = store.create("Rechnung", "todo", &jiff::Zoned::now());
         t.save().unwrap();
         let ids = candidates(&store, Kind::Ids).unwrap();
-        assert_eq!(ids, [format!("{}\tRechnung (Offen)", t.id)]);
+        assert_eq!(ids, [format!("{}\tRechnung (Todo)", t.id)]);
         let st = candidates(&store, Kind::Statuses).unwrap();
-        assert_eq!(st[0], "todo\tOffen");
+        assert_eq!(st[0], "todo\tTodo");
         assert_eq!(candidates(&store, Kind::Buckets).unwrap(), ["-\tno bucket"]);
         assert!(candidates(&store, Kind::AtBuckets).unwrap().is_empty());
     }

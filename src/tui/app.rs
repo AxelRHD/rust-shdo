@@ -142,16 +142,19 @@ pub enum SettingsRow {
     AutoSync,
     Holidays,
     Archive,
+    /// shdo.toml: status and bucket names (shared via the repository)
+    EditBoard,
     OpenFile,
 }
 
-pub const SETTINGS_ROWS: [SettingsRow; 7] = [
+pub const SETTINGS_ROWS: [SettingsRow; 8] = [
     SettingsRow::Language,
     SettingsRow::DefaultBucket,
     SettingsRow::DoneDays,
     SettingsRow::AutoSync,
     SettingsRow::Holidays,
     SettingsRow::Archive,
+    SettingsRow::EditBoard,
     SettingsRow::OpenFile,
 ];
 
@@ -316,6 +319,10 @@ impl App {
                     self.config_request = true;
                     return;
                 }
+                SettingsRow::EditBoard => {
+                    self.editor_request = Some(self.store.dir.join(crate::store::BOARD_FILE));
+                    return;
+                }
                 _ => return self.change_setting(idx, row, 1),
             },
             _ => {}
@@ -388,7 +395,7 @@ impl App {
                     None => config::remove_key(&path, "holidays"),
                 }
             }
-            SettingsRow::Archive | SettingsRow::OpenFile => Ok(()),
+            SettingsRow::Archive | SettingsRow::EditBoard | SettingsRow::OpenFile => Ok(()),
         };
         match res {
             Ok(()) => self.reload_config(),
@@ -570,7 +577,18 @@ impl App {
     pub fn after_editor(&mut self, path: PathBuf, res: Result<()>) {
         let keep = self.selected_id();
         self.reload(keep);
-        match res.and_then(|()| Task::load(&path).map(|_| ())) {
+        // shdo.toml is checked as board config, everything else as a task file
+        let is_board = path
+            .file_name()
+            .is_some_and(|n| n == crate::store::BOARD_FILE);
+        let check = |()| {
+            if is_board {
+                self.store.board_config().map(|_| ())
+            } else {
+                Task::load(&path).map(|_| ())
+            }
+        };
+        match res.and_then(check) {
             Ok(()) => self.set_status(Level::Ok, t!("msg.saved")),
             Err(e) => self.set_status(Level::Error, format!("{}: {e:#}", path.display())),
         }

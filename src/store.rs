@@ -8,39 +8,45 @@ use jiff::Zoned;
 
 use rust_i18n::t;
 
-use crate::i18n::{self, Lang};
 use crate::task::Task;
 
 pub const BOARD_FILE: &str = "shdo.toml";
 const ID_CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
 
-/// Initial `shdo.toml`: English comments, status names in the given language.
-pub fn default_board(lang: Lang) -> String {
-    let l = lang.code();
-    let status = |key: &str, name_key: &str| {
-        format!(
-            "[[status]]\nkey = \"{key}\"\nname = \"{}\"\n",
-            t!(name_key, locale = l)
-        )
-    };
-    format!(
-        "# Task statuses, each shown as a board column. New tasks get the first one,\n\
-         # the last one counts as done. The key is stored in task files, the name is\n\
-         # only displayed and can be changed at any time.\n\n\
-         {}\n{}\n{}\n{}\n\
-         # Optional buckets such as home/work follow below. Each task is in at most one\n\
-         # bucket, and each machine picks which buckets it shows. In the board, f opens\n\
-         # the filter, where n / r / d create, rename and delete buckets.\n",
-        status("todo", "board.default.todo"),
-        status("doing", "board.default.doing"),
-        status("wait", "board.default.wait"),
-        status("done", "board.default.done"),
-    )
+/// Initial `shdo.toml`. Statuses without a `name` are shown in the board's language,
+/// so the file stays neutral when it is shared between machines.
+pub fn default_board() -> String {
+    "# Task statuses, each shown as a board column. New tasks get the first one,\n\
+     # the last one counts as done. The key is stored in task files. An optional\n\
+     # name is only displayed; without one, todo/doing/wait/done are shown in the\n\
+     # board's language.\n\n\
+     [[status]]\nkey = \"todo\"\n\n\
+     [[status]]\nkey = \"doing\"\n\n\
+     [[status]]\nkey = \"wait\"\n\n\
+     [[status]]\nkey = \"done\"\n\n\
+     # Optional buckets such as home/work follow below. Each task is in at most one\n\
+     # bucket, and each machine picks which buckets it shows. In the board, f opens\n\
+     # the filter, where n / r / d create, rename and delete buckets.\n"
+        .to_string()
+}
+
+/// Display name for a status or bucket without `name`: the translation for the
+/// standard keys, otherwise the key itself.
+fn default_name(key: &str) -> String {
+    match key {
+        "todo" | "doing" | "wait" | "done" | "home" | "work" => {
+            let k = format!("board.default.{key}");
+            t!(k.as_str()).into_owned()
+        }
+        other => other.to_string(),
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct StatusDef {
     pub key: String,
+    /// Optional in the file; filled with a default name when loading.
+    #[serde(default)]
     pub name: String,
 }
 
@@ -124,8 +130,7 @@ impl Store {
     }
 
     /// Creates the directory layout. Returns what was newly created.
-    /// `lang` decides the status names written to a new `shdo.toml`.
-    pub fn init(&self, lang: Lang) -> Result<Vec<String>> {
+    pub fn init(&self) -> Result<Vec<String>> {
         let mut created = Vec::new();
         for d in [self.dir.clone(), self.tasks_dir(), self.archive_dir()] {
             if !d.is_dir() {
@@ -141,7 +146,7 @@ impl Store {
         }
         let board = self.dir.join(BOARD_FILE);
         if !board.exists() {
-            fs::write(&board, default_board(lang))?;
+            fs::write(&board, default_board())?;
             created.push(board.display().to_string());
         }
         Ok(created)
@@ -152,7 +157,7 @@ impl Store {
         let path = self.dir.join(BOARD_FILE);
         let raw = match fs::read_to_string(&path) {
             Ok(raw) => raw,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => default_board(i18n::current()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => default_board(),
             Err(e) => {
                 return Err(e).with_context(|| t!("io.read", path = path.display()).into_owned());
             }
@@ -164,7 +169,7 @@ impl Store {
         let path = self.dir.join(BOARD_FILE);
         let raw = match fs::read_to_string(&path) {
             Ok(raw) => raw,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => default_board(i18n::current()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => default_board(),
             Err(e) => {
                 return Err(e).with_context(|| t!("io.read", path = path.display()).into_owned());
             }
@@ -183,10 +188,8 @@ impl Store {
     /// Appends a new bucket to `shdo.toml`; comments are preserved.
     pub fn add_bucket(&self, key: &str, name: &str) -> Result<()> {
         let key = key.trim();
+        // Without a name the bucket is shown with its default name (home/work) or key
         let name = name.trim();
-        if name.is_empty() {
-            bail!(t!("bucket.name_missing"));
-        }
         validate_bucket_key(key)?;
         let cfg = self.board_config()?;
         if cfg.buckets.iter().any(|b| b.key == key) {
@@ -195,7 +198,9 @@ impl Store {
         let mut doc = self.board_doc()?;
         let mut table = toml_edit::Table::new();
         table["key"] = toml_edit::value(key);
-        table["name"] = toml_edit::value(name);
+        if !name.is_empty() {
+            table["name"] = toml_edit::value(name);
+        }
         match doc
             .get_mut("buckets")
             .and_then(|i| i.as_array_of_tables_mut())
@@ -357,7 +362,7 @@ pub fn parse_board(raw: &str) -> Result<BoardConfig> {
     let file: BoardFile = toml::from_str(raw)?;
     let statuses = match file.status {
         Some(c) => c,
-        None => toml::from_str::<BoardFile>(&default_board(i18n::current()))?
+        None => toml::from_str::<BoardFile>(&default_board())?
             .status
             .expect("default board has statuses"),
     };
@@ -373,9 +378,21 @@ pub fn parse_board(raw: &str) -> Result<BoardConfig> {
     {
         bail!(t!("bucket.key_reserved", key = b.key));
     }
+    let named = |defs: Vec<StatusDef>| {
+        defs.into_iter()
+            .map(|d| StatusDef {
+                name: if d.name.trim().is_empty() {
+                    default_name(&d.key)
+                } else {
+                    d.name
+                },
+                key: d.key,
+            })
+            .collect()
+    };
     Ok(BoardConfig {
-        statuses,
-        buckets: file.buckets,
+        statuses: named(statuses),
+        buckets: named(file.buckets),
     })
 }
 
@@ -477,14 +494,14 @@ mod tests {
     fn store() -> (tempfile::TempDir, Store) {
         let tmp = tempfile::tempdir().unwrap();
         let s = Store::new(tmp.path().join("tasks-repo"));
-        s.init(Lang::De).unwrap();
+        s.init().unwrap();
         (tmp, s)
     }
 
     #[test]
     fn init_is_idempotent_and_has_default_statuses() {
         let (_tmp, s) = store();
-        assert!(s.init(Lang::De).unwrap().is_empty());
+        assert!(s.init().unwrap().is_empty());
         let cfg = s.board_config().unwrap();
         assert!(cfg.buckets.is_empty());
         let keys: Vec<_> = cfg.statuses.iter().map(|c| c.key.as_str()).collect();
@@ -532,7 +549,7 @@ mod tests {
         fs::write(tmp.path().join("datei"), "x").unwrap();
         assert_eq!(at("datei").dir_state(), DirState::NotADir);
         let s = at("repo");
-        s.init(Lang::En).unwrap();
+        s.init().unwrap();
         assert_eq!(s.dir_state(), DirState::Shdo);
     }
 
@@ -544,7 +561,16 @@ mod tests {
         assert!(s.add_bucket("work", "Doppelt").is_err());
         assert!(s.add_bucket("Gross", "x").is_err());
         assert!(s.add_bucket("-", "x").is_err());
-        assert!(s.add_bucket("ok", " ").is_err());
+        // a bucket without a name shows its key (or the default name for home/work)
+        s.add_bucket("ok", " ").unwrap();
+        assert!(
+            s.board_config()
+                .unwrap()
+                .buckets
+                .iter()
+                .any(|b| b.key == "ok" && b.name == "ok")
+        );
+        s.remove_bucket("ok").unwrap();
         s.rename_bucket("work", "Job").unwrap();
         let cfg = s.board_config().unwrap();
         let names: Vec<_> = cfg.buckets.iter().map(|b| b.name.as_str()).collect();
@@ -555,6 +581,22 @@ mod tests {
         assert!(s.board_config().unwrap().buckets.is_empty());
         let raw = fs::read_to_string(s.dir.join(BOARD_FILE)).unwrap();
         assert!(raw.contains("# Optional buckets"), "{raw}");
+    }
+
+    #[test]
+    fn default_names_follow_the_language() {
+        let cfg = parse_board(&default_board()).unwrap();
+        let names: Vec<_> = cfg.statuses.iter().map(|s| s.name.as_str()).collect();
+        // tests run with the English fallback locale
+        assert_eq!(names, ["Todo", "Doing", "Waiting", "Done"]);
+        assert!(!default_board().contains("name ="));
+        let cfg = parse_board(
+            "[[status]]\nkey='x'\n[[status]]\nkey='done'\nname='Fertig'\n[[buckets]]\nkey='home'",
+        )
+        .unwrap();
+        assert_eq!(cfg.statuses[0].name, "x");
+        assert_eq!(cfg.statuses[1].name, "Fertig");
+        assert_eq!(cfg.buckets[0].name, "Home");
     }
 
     #[test]

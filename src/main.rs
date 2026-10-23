@@ -265,7 +265,7 @@ fn run() -> Result<()> {
             }
             Ok(())
         }
-        Cmd::Init => init(&store, cfg.lang()),
+        Cmd::Init => init(&store),
         Cmd::Setup => tui::run(cli.dir, cfg, cfg_path, true),
         // already handled before the initialization check
         Cmd::Completions { .. } | Cmd::Complete { .. } => Ok(()),
@@ -447,8 +447,8 @@ fn ls(store: &Store, filter: &Filter) -> Result<()> {
     Ok(())
 }
 
-fn init(store: &Store, lang: i18n::Lang) -> Result<()> {
-    for c in store.init(lang)? {
+fn init(store: &Store) -> Result<()> {
+    for c in store.init()? {
         println!("created   {c}");
     }
     let git = git::Git::new(&store.dir, false);

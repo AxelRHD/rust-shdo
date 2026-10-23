@@ -1195,3 +1195,6 @@ filter.tab_tags:
 kb.tab:
   en: "buckets/tags"
   de: "Buckets/Tags"
+settings.edit_board:
+  en: "Edit statuses & buckets (shdo.toml, shared)"
+  de: "Spalten & Buckets bearbeiten (shdo.toml, geteilt)"

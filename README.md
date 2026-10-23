@@ -156,8 +156,9 @@ Numbers are in the shared drive.
 ```
 
 The data directory contains `shdo.toml` with the statuses and buckets, `tasks/` and
-`archive/`. Statuses and buckets have a stable `key` used in the files and a `name` that
-is only displayed, so renaming never touches your tasks. Comments and unknown fields in
+`archive/`. Statuses and buckets have a stable `key` used in the files and an optional `name`
+that is only displayed, so renaming never touches your tasks. Without a name, the
+standard keys (todo, doing, wait, done, home, work) appear in the board's language. Comments and unknown fields in
 these files are preserved when shdo writes them.
 
 ## Configuration

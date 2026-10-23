@@ -451,7 +451,11 @@ mod tests {
 
     #[test]
     fn counts_and_resolve() {
-        let defs = parse_board(&crate::store::default_board(crate::i18n::Lang::De)).unwrap();
+        let defs = parse_board(
+            "[[status]]\nkey='todo'\nname='Offen'\n[[status]]\nkey='doing'\nname='In Arbeit'\n\
+             [[status]]\nkey='wait'\nname='Wartet'\n[[status]]\nkey='done'\nname='Erledigt'",
+        )
+        .unwrap();
         let mut done = task("x", "due = 2020-01-01");
         done.status = "done".into();
         let board = Board::build(
