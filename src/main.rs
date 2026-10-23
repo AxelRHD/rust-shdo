@@ -158,7 +158,9 @@ fn run() -> Result<()> {
         store.ensure_initialized()?;
     }
     match cmd {
-        Cmd::Add { text } | Cmd::Text(text) => add(&store, &filter, &text),
+        Cmd::Add { text } | Cmd::Text(text) => {
+            add(&store, &filter, cfg.default_bucket.as_deref(), &text)
+        }
         Cmd::Ls { all: true, .. } => ls(&store, &all),
         Cmd::Ls {
             bucket: Some(b), ..
@@ -298,20 +300,31 @@ fn osa_distance(a: &str, b: &str) -> usize {
     d[a.len()][b.len()]
 }
 
-fn add(store: &Store, filter: &Filter, text: &[String]) -> Result<()> {
+fn add(
+    store: &Store,
+    filter: &Filter,
+    default_bucket: Option<&str>,
+    text: &[String],
+) -> Result<()> {
     let q = quickadd::parse(text, dates::today())?;
     let cfg = store.board_config()?;
     let filter = filter.clone().normalized(&cfg.buckets);
-    let (bucket, inherited) = board::bucket_for_new(q.bucket.as_deref(), &filter, &cfg.buckets)?;
+    let picked = board::bucket_for_new(q.bucket.as_deref(), &filter, &cfg.buckets, default_bucket)?;
+    let bucket = picked.as_ref().map(|(b, _)| b.clone());
     let mut task = store.create(&q.title, &cfg.statuses[0].key, &jiff::Zoned::now());
     task.set_prio(q.prio);
     task.set_due(q.due);
     task.set_bucket(bucket.as_deref());
     task.save()?;
-    match (&bucket, inherited) {
-        (Some(b), true) => println!("{}  {}  @{b} (from filter)", task.id, task.title),
-        (Some(b), false) => println!("{}  {}  @{b}", task.id, task.title),
-        (None, _) => println!("{}  {}", task.id, task.title),
+    match picked {
+        Some((b, board::BucketOrigin::Filter)) => {
+            println!("{}  {}  @{b} (from filter)", task.id, task.title)
+        }
+        Some((b, board::BucketOrigin::Default)) => {
+            println!("{}  {}  @{b} (default)", task.id, task.title)
+        }
+        Some((b, board::BucketOrigin::Explicit)) => println!("{}  {}  @{b}", task.id, task.title),
+        None => println!("{}  {}", task.id, task.title),
     }
     Ok(())
 }
@@ -350,7 +363,7 @@ fn ls(store: &Store, filter: &Filter) -> Result<()> {
         println!();
     }
     // Show the bucket per line only if more than one can be visible
-    let show_bucket = !board.buckets.is_empty() && board.filter.inherited().is_none();
+    let show_bucket = !board.buckets.is_empty() && !board.filter.shows_single_bucket();
     for (ci, col) in board.columns.iter().enumerate() {
         if ci > 0 {
             println!();

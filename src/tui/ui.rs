@@ -11,6 +11,7 @@ use unicode_width::UnicodeWidthStr;
 use super::app::{App, Level, Mode};
 use super::calendar;
 use super::form::{Field, Form, Input, prio_name};
+use crate::board::BucketOrigin;
 use crate::dates;
 use crate::task::Task;
 use crate::theme::Palette;
@@ -312,7 +313,7 @@ fn draw_column(
         last: is_last,
         today: dates::today(),
         width: inner.width,
-        show_bucket: !app.board.buckets.is_empty() && app.board.filter.inherited().is_none(),
+        show_bucket: !app.board.buckets.is_empty() && !app.board.filter.shows_single_bucket(),
     };
     let column = &app.board.columns[ci];
     for (i, task) in column.tasks.iter().enumerate().skip(off).take(fit) {
@@ -980,9 +981,13 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
                 spans.extend(choice(form.bucket_label(), style, focused));
                 if let Some(b) = tokens.as_ref().and_then(|q| q.bucket.as_ref()) {
                     spans.push(overrides(c, format!("@{b}")));
-                } else if form.inherited {
+                } else if let Some(origin) = form.origin {
+                    let key = match origin {
+                        BucketOrigin::Default => "form.default_bucket",
+                        _ => "form.from_filter",
+                    };
                     spans.push(Span::styled(
-                        format!("  {}", t!("form.from_filter")),
+                        format!("  {}", t!(key)),
                         Style::new().fg(c.key),
                     ));
                 }
@@ -1016,7 +1021,15 @@ fn title_hint(
     if !has_token {
         return Line::from(vec![
             pad,
-            Span::styled(t!("form.tokens_hint").into_owned(), Style::new().fg(c.dim)),
+            Span::styled(
+                // Only mention @bucket when there are buckets to pick from
+                if app.board.buckets.is_empty() {
+                    t!("form.tokens_hint_no_buckets").into_owned()
+                } else {
+                    t!("form.tokens_hint").into_owned()
+                },
+                Style::new().fg(c.dim),
+            ),
         ]);
     }
     let q = match crate::quickadd::parse_str(text, today) {

@@ -23,6 +23,8 @@ use crate::theme::Palette;
 enum Step {
     Language,
     Dir,
+    /// Only for a new board: start with home/work buckets or none.
+    Buckets,
     Country,
     State,
     Summary,
@@ -37,6 +39,8 @@ struct Setup {
     /// 0 = no holidays, 1 = Germany
     country: usize,
     state: usize,
+    /// 0 = home and work, 1 = none (only asked for a new board)
+    buckets: usize,
     error: Option<String>,
 }
 
@@ -69,6 +73,7 @@ impl Setup {
             foreign_confirmed: false,
             country,
             state,
+            buckets: 0,
             error: None,
         }
     }
@@ -87,12 +92,21 @@ impl Setup {
 
     /// Steps shown to the user (the state only matters for Germany).
     fn steps(&self) -> Vec<Step> {
-        let mut steps = vec![Step::Language, Step::Dir, Step::Country];
+        let mut steps = vec![Step::Language, Step::Dir];
+        if self.new_board() {
+            steps.push(Step::Buckets);
+        }
+        steps.push(Step::Country);
         if self.country == 1 {
             steps.push(Step::State);
         }
         steps.push(Step::Summary);
         steps
+    }
+
+    /// An existing shdo directory keeps its buckets; only a new board asks for them.
+    fn new_board(&self) -> bool {
+        self.store().dir_state() != DirState::Shdo
     }
 
     fn go(&mut self, delta: isize) {
@@ -127,6 +141,7 @@ impl Setup {
                 self.foreign_confirmed = false;
                 self.error = None;
             }
+            (Step::Buckets, code) => step_list(2, &mut self.buckets, code),
             (Step::Country, code) => step_list(2, &mut self.country, code),
             (Step::State, code) => step_list(GERMAN_STATES.len(), &mut self.state, code),
             (Step::Summary, _) => {}
@@ -153,6 +168,16 @@ impl Setup {
             holidays: self.holidays(),
         }
     }
+}
+
+/// "Home and Work (home, work)" in the active language.
+fn bucket_pair_label() -> String {
+    t!(
+        "setup.buckets.both",
+        home = t!("board.default.home"),
+        work = t!("board.default.work")
+    )
+    .into_owned()
 }
 
 /// Describes the chosen directory: (text, is a warning).
@@ -198,9 +223,15 @@ pub fn run(
         }
     }
     let result = setup.result();
+    let new_board = setup.new_board();
     config::write_setup(cfg_path, &result)?;
     let store = setup.store();
     store.init(result.language)?;
+    if new_board && setup.buckets == 0 {
+        let l = result.language.code();
+        store.add_bucket("home", &t!("board.default.home", locale = l))?;
+        store.add_bucket("work", &t!("board.default.work", locale = l))?;
+    }
     let git = crate::git::Git::new(&store.dir, true);
     if !git.is_repo() {
         git.init()?;
@@ -214,7 +245,7 @@ fn draw(f: &mut ratatui::Frame, s: &Setup, c: &Palette, cfg_path: &std::path::Pa
     let keys: Vec<(&str, &str)> = match s.step {
         Step::Language => vec![("j/k", "kb.select"), ("⏎", "kb.next"), ("Esc", "kb.quit")],
         Step::Dir => vec![("⏎", "kb.next"), ("Esc", "kb.back"), ("^U", "kb.clear")],
-        Step::Country | Step::State => {
+        Step::Buckets | Step::Country | Step::State => {
             vec![("j/k", "kb.select"), ("⏎", "kb.next"), ("Esc", "kb.back")]
         }
         Step::Summary => vec![("⏎", "kb.finish"), ("Esc", "kb.back")],
@@ -234,6 +265,7 @@ fn draw(f: &mut ratatui::Frame, s: &Setup, c: &Palette, cfg_path: &std::path::Pa
     let (heading, hint) = match s.step {
         Step::Language => ("setup.lang.title", "setup.lang.hint"),
         Step::Dir => ("setup.dir.title", "setup.dir.hint"),
+        Step::Buckets => ("setup.buckets.title", "setup.buckets.hint"),
         Step::Country => ("setup.country.title", "setup.country.hint"),
         Step::State => ("setup.state.title", "setup.state.hint"),
         Step::Summary => ("setup.summary.title", "setup.summary.hint"),
@@ -292,6 +324,13 @@ fn draw(f: &mut ratatui::Frame, s: &Setup, c: &Palette, cfg_path: &std::path::Pa
                 )));
             }
         }
+        Step::Buckets => {
+            lines.push(choice(s.buckets == 0, bucket_pair_label()));
+            lines.push(choice(
+                s.buckets == 1,
+                t!("setup.buckets.none").into_owned(),
+            ));
+        }
         Step::Country => {
             lines.push(choice(
                 s.country == 0,
@@ -323,6 +362,14 @@ fn draw(f: &mut ratatui::Frame, s: &Setup, c: &Palette, cfg_path: &std::path::Pa
                 Some(_) => format!("{}, {}", t!("setup.country.de"), GERMAN_STATES[s.state].2),
                 None => t!("setup.country.none").into_owned(),
             };
+            let buckets = if !s.new_board() {
+                t!("setup.buckets.existing").into_owned()
+            } else if s.buckets == 0 {
+                bucket_pair_label()
+            } else {
+                t!("setup.buckets.none").into_owned()
+            };
+            lines.push(row("setup.summary.buckets", buckets));
             lines.push(row("setup.summary.holidays", holidays));
             lines.push(Line::default());
             lines.push(Line::from(Span::styled(
@@ -387,6 +434,10 @@ mod tests {
         s.handle(key(KeyCode::Enter));
         assert_eq!(s.step, Step::Dir);
         s.handle(key(KeyCode::Enter));
+        // new directory: buckets are offered, home/work preselected
+        assert_eq!(s.step, Step::Buckets);
+        assert_eq!(s.buckets, 0);
+        s.handle(key(KeyCode::Enter));
         assert_eq!(s.step, Step::Country);
         // Germany adds the state step
         s.handle(key(KeyCode::Down));
@@ -416,7 +467,19 @@ mod tests {
         assert_eq!(s.step, Step::Dir);
         assert!(s.foreign_confirmed);
         s.handle(key(KeyCode::Enter));
+        // a non-empty foreign directory still becomes a new board
+        assert_eq!(s.step, Step::Buckets);
+    }
+
+    #[test]
+    fn existing_board_skips_the_bucket_step() {
+        let tmp = tempfile::tempdir().unwrap();
+        Store::new(tmp.path().to_path_buf()).init(Lang::En).unwrap();
+        let mut s = Setup::new(&cfg("en"), Some(tmp.path()));
+        s.step = Step::Dir;
+        s.handle(key(KeyCode::Enter));
         assert_eq!(s.step, Step::Country);
+        assert!(!s.steps().contains(&Step::Buckets));
     }
 
     #[test]

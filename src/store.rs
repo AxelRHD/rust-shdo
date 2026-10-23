@@ -28,22 +28,13 @@ pub fn default_board(lang: Lang) -> String {
          # the last one counts as done. The key is stored in task files, the name is\n\
          # only displayed and can be changed at any time.\n\n\
          {}\n{}\n{}\n{}\n\
-         # Optional buckets, e.g. home/work. Each task is in at most one bucket.\n\
-         # Each machine picks which buckets it shows (key f in the board).\n\
-         #\n\
-         # [[buckets]]\n\
-         # key = \"home\"\n\
-         # name = \"{}\"\n\
-         #\n\
-         # [[buckets]]\n\
-         # key = \"work\"\n\
-         # name = \"{}\"\n",
+         # Optional buckets such as home/work follow below. Each task is in at most one\n\
+         # bucket, and each machine picks which buckets it shows. In the board, f opens\n\
+         # the filter, where n / r / d create, rename and delete buckets.\n",
         status("todo", "board.default.todo"),
         status("doing", "board.default.doing"),
         status("wait", "board.default.wait"),
         status("done", "board.default.done"),
-        t!("board.default.home", locale = l),
-        t!("board.default.work", locale = l),
     )
 }
 

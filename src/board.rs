@@ -54,12 +54,19 @@ impl Filter {
         query.split_whitespace().all(|word| haystack.contains(word))
     }
 
-    /// If exactly one real bucket is selected, new tasks inherit it.
+    /// If exactly one real bucket is selected, new tasks inherit it. "No bucket" does not
+    /// count: showing work plus unassigned tasks still means new tasks belong to work.
     pub fn inherited(&self) -> Option<&str> {
-        match self.buckets.as_slice() {
-            [one] if one != NO_BUCKET => Some(one),
+        let mut real = self.buckets.iter().filter(|b| *b != NO_BUCKET);
+        match (real.next(), real.next()) {
+            (Some(one), None) => Some(one),
             _ => None,
         }
+    }
+
+    /// Only a single bucket is visible, so showing `@bucket` on every card adds nothing.
+    pub fn shows_single_bucket(&self) -> bool {
+        matches!(self.buckets.as_slice(), [one] if one != NO_BUCKET)
     }
 }
 
@@ -216,20 +223,37 @@ impl Board {
     }
 }
 
-/// Bucket for a new task: explicit via `@…`, otherwise inherited from the filter.
-/// Returns (bucket key, inherited?).
+/// Where a new task's bucket came from, so the UI can say so.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BucketOrigin {
+    /// `@bucket` in the title
+    Explicit,
+    /// exactly one bucket is shown in the filter
+    Filter,
+    /// `default_bucket` in config.toml
+    Default,
+}
+
+/// Bucket for a new task: `@…` in the title, else the filter (exactly one bucket shown),
+/// else the per-machine default. An unknown default bucket is ignored.
 pub fn bucket_for_new(
     explicit: Option<&str>,
     filter: &Filter,
     buckets: &[BucketDef],
-) -> Result<(Option<String>, bool)> {
-    match explicit {
-        Some(raw) => Ok((Some(resolve_bucket(buckets, raw)?), false)),
-        None => Ok(match filter.inherited() {
-            Some(b) => (Some(b.to_string()), true),
-            None => (None, false),
-        }),
+    default: Option<&str>,
+) -> Result<Option<(String, BucketOrigin)>> {
+    if let Some(raw) = explicit {
+        return Ok(Some((
+            resolve_bucket(buckets, raw)?,
+            BucketOrigin::Explicit,
+        )));
     }
+    if let Some(b) = filter.inherited() {
+        return Ok(Some((b.to_string(), BucketOrigin::Filter)));
+    }
+    Ok(default
+        .filter(|d| buckets.iter().any(|b| b.key == *d))
+        .map(|d| (d.to_string(), BucketOrigin::Default)))
 }
 
 pub fn resolve_bucket(buckets: &[BucketDef], raw: &str) -> Result<String> {
@@ -396,6 +420,47 @@ mod tests {
 
     fn bucket_task(id: &str, bucket: &str) -> Task {
         task(id, &format!("bucket = \"{bucket}\""))
+    }
+
+    #[test]
+    fn bucket_for_new_tasks() {
+        let cfg = parse_board(
+            "[[buckets]]\nkey='home'\nname='Privat'\n[[buckets]]\nkey='work'\nname='Arbeit'",
+        )
+        .unwrap();
+        let all = Filter::all();
+        let work = Filter {
+            buckets: vec!["work".into()],
+            ..Filter::default()
+        };
+        let pick = |explicit, filter: &Filter, default| {
+            bucket_for_new(explicit, filter, &cfg.buckets, default).unwrap()
+        };
+        assert_eq!(
+            pick(Some("hom"), &work, Some("work")),
+            Some(("home".into(), BucketOrigin::Explicit))
+        );
+        assert_eq!(
+            pick(None, &work, Some("home")),
+            Some(("work".into(), BucketOrigin::Filter))
+        );
+        assert_eq!(
+            pick(None, &all, Some("work")),
+            Some(("work".into(), BucketOrigin::Default))
+        );
+        assert_eq!(pick(None, &all, Some("gone")), None);
+        assert_eq!(pick(None, &all, None), None);
+        // work plus "no bucket" shown: new tasks still belong to work
+        let work_and_none = Filter {
+            buckets: vec!["work".into(), NO_BUCKET.into()],
+            ..Filter::default()
+        };
+        assert_eq!(
+            pick(None, &work_and_none, None),
+            Some(("work".into(), BucketOrigin::Filter))
+        );
+        assert!(!work_and_none.shows_single_bucket());
+        assert!(work.shows_single_bucket());
     }
 
     #[test]

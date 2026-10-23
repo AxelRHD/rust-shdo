@@ -9,7 +9,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rust_i18n::t;
 
 use super::form::{Form, Input};
-use crate::board::{self, Board, Filter, NO_BUCKET};
+use crate::board::{self, Board, BucketOrigin, Filter, NO_BUCKET};
 use crate::config::{self, AppConfig};
 use crate::git::Git;
 use crate::holidays::Region;
@@ -516,7 +516,11 @@ impl App {
             KeyCode::Char('g') | KeyCode::Home => self.rows[self.col] = 0,
             KeyCode::Char('G') | KeyCode::End => self.step(isize::MAX),
             KeyCode::Char('n') => {
-                self.mode = Mode::Form(Box::new(Form::new_task(&self.board, self.col)))
+                self.mode = Mode::Form(Box::new(Form::new_task(
+                    &self.board,
+                    self.col,
+                    self.cfg.default_bucket.as_deref(),
+                )))
             }
             KeyCode::Char('e') => self.open_edit_form(),
             KeyCode::Char('r') => {
@@ -719,8 +723,14 @@ impl App {
         };
         if let Some(b) = &bucket {
             msg.push_str(&format!(" @{b}"));
-            if form.inherited && q.bucket.is_none() {
-                msg.push_str(&format!(" ({})", t!("msg.from_filter")));
+            match (form.origin, &q.bucket) {
+                (Some(BucketOrigin::Filter), None) => {
+                    msg.push_str(&format!(" ({})", t!("msg.from_filter")))
+                }
+                (Some(BucketOrigin::Default), None) => {
+                    msg.push_str(&format!(" ({})", t!("msg.default_bucket")))
+                }
+                _ => {}
             }
         }
         if self.board.find(&id).is_none() {

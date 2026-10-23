@@ -1045,3 +1045,30 @@ msg.settings_applied:
 msg.dir_next_start:
   en: "the new data directory is used on the next start"
   de: "das neue Datenverzeichnis gilt ab dem nächsten Start"
+setup.buckets.title:
+  en: "Buckets"
+  de: "Buckets"
+setup.buckets.hint:
+  en: "Separate e.g. personal and work tasks; each machine can show only some. Optional."
+  de: "Trennen z. B. private und berufliche Tasks; jeder Rechner kann nur einen Teil zeigen. Optional."
+setup.buckets.both:
+  en: "%{home} and %{work} (home, work)"
+  de: "%{home} und %{work} (home, work)"
+setup.buckets.none:
+  en: "None"
+  de: "Keine"
+setup.buckets.existing:
+  en: "kept from the directory"
+  de: "aus dem Verzeichnis übernommen"
+setup.summary.buckets:
+  en: "Buckets"
+  de: "Buckets"
+msg.default_bucket:
+  en: "default"
+  de: "Standard"
+form.default_bucket:
+  en: "default bucket (settings)"
+  de: "Standard-Bucket (Einstellungen)"
+form.tokens_hint_no_buckets:
+  en: "P1–P3 · due:fri work in the title too"
+  de: "P1–P3 · due:fr im Titel gehen auch"

@@ -3,7 +3,7 @@
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rust_i18n::t;
 
-use crate::board::Board;
+use crate::board::{Board, BucketOrigin, bucket_for_new};
 use crate::task::{PRIO_DEFAULT, Task};
 
 #[derive(Default, Clone)]
@@ -110,7 +110,7 @@ pub struct Form {
     pub bucket_names: Vec<String>,
     pub bucket_keys: Vec<String>,
     /// The bucket was taken over from the filter and not touched yet.
-    pub inherited: bool,
+    pub origin: Option<BucketOrigin>,
     pub note: Input,
     /// Multi-line notes can only be edited in the editor.
     pub note_editable: bool,
@@ -135,22 +135,26 @@ impl Form {
             bucket: 0,
             bucket_names: board.buckets.iter().map(|b| b.name.clone()).collect(),
             bucket_keys: board.buckets.iter().map(|b| b.key.clone()).collect(),
-            inherited: false,
+            origin: None,
             note: Input::default(),
             note_editable: true,
         }
     }
 
-    pub fn new_task(board: &Board, status: usize) -> Form {
+    /// `default_bucket` from the config preselects the bucket unless the filter decides.
+    pub fn new_task(board: &Board, status: usize, default_bucket: Option<&str>) -> Form {
         let mut f = Form::base(board);
         f.status = status;
-        if let Some(b) = board.filter.inherited() {
+        let picked = bucket_for_new(None, &board.filter, &board.buckets, default_bucket)
+            .ok()
+            .flatten();
+        if let Some((b, origin)) = picked {
             f.bucket = f
                 .bucket_keys
                 .iter()
-                .position(|k| k == b)
+                .position(|k| *k == b)
                 .map_or(0, |i| i + 1);
-            f.inherited = f.bucket > 0;
+            f.origin = (f.bucket > 0).then_some(origin);
         }
         f
     }
@@ -211,7 +215,7 @@ impl Form {
             Field::Prio => self.prio = wrap(self.prio as usize - 1, 3) as u8 + 1,
             Field::Bucket => {
                 self.bucket = wrap(self.bucket, self.bucket_names.len() + 1);
-                self.inherited = false;
+                self.origin = None;
             }
             _ => {}
         }
@@ -263,18 +267,21 @@ mod tests {
 
     #[test]
     fn new_task_inherits_single_bucket() {
-        let f = Form::new_task(&board(&["work"]), 1);
+        let f = Form::new_task(&board(&["work"]), 1, None);
         assert_eq!(f.bucket_key(), Some("work"));
-        assert!(f.inherited);
+        assert_eq!(f.origin, Some(BucketOrigin::Filter));
         assert_eq!(f.status, 1);
-        let f = Form::new_task(&board(&["work", "home"]), 0);
+        let f = Form::new_task(&board(&["work", "home"]), 0, None);
         assert_eq!(f.bucket_key(), None);
-        assert!(!f.inherited);
+        assert_eq!(f.origin, None);
+        let f = Form::new_task(&board(&["work", "home"]), 0, Some("home"));
+        assert_eq!(f.bucket_key(), Some("home"));
+        assert_eq!(f.origin, Some(BucketOrigin::Default));
     }
 
     #[test]
     fn navigation_and_choices() {
-        let mut f = Form::new_task(&board(&["work"]), 0);
+        let mut f = Form::new_task(&board(&["work"]), 0, None);
         assert_eq!(f.fields.len(), 6);
         for ch in "Hallo h".chars() {
             f.handle(key(KeyCode::Char(ch)));
@@ -294,7 +301,7 @@ mod tests {
         assert_eq!(f.focused(), Field::Bucket);
         f.handle(key(KeyCode::Right));
         assert_eq!(f.bucket_key(), None);
-        assert!(!f.inherited);
+        assert_eq!(f.origin, None);
         f.handle(key(KeyCode::BackTab));
         f.handle(key(KeyCode::Up));
         f.handle(key(KeyCode::Up));
@@ -306,7 +313,7 @@ mod tests {
     #[test]
     fn no_bucket_field_without_buckets() {
         let b = Board::build(parse_board("").unwrap(), vec![], vec![], Filter::all());
-        let f = Form::new_task(&b, 0);
+        let f = Form::new_task(&b, 0, None);
         assert!(!f.fields.contains(&Field::Bucket));
     }
 }
