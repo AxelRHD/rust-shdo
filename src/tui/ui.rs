@@ -57,6 +57,7 @@ const HELP: &[(&str, &[(&str, &str)])] = &[
             ("Esc", "help.form.discard"),
             ("P1 due: @", "help.form.tokens"),
             ("→", "help.form.complete"),
+            ("⌫", "help.form.remove_tag"),
         ],
     ),
     (
@@ -971,6 +972,43 @@ fn input_spans(
     (spans, cx)
 }
 
+/// Tags field: finished tags as pills (unknown ones in the warning colour), then the word
+/// being typed with its suggestion. `None` when the cursor is not at the end or the pills
+/// do not fit – the field is then shown as plain text.
+fn tag_pills(form: &Form, width: usize, c: &Palette) -> Option<(Vec<Span<'static>>, usize)> {
+    let input = &form.tags;
+    if input.cursor != input.text.chars().count() {
+        return None;
+    }
+    let (done, typing) = match input.text.rfind(char::is_whitespace) {
+        Some(i) => input.text.split_at(i + 1),
+        None => ("", input.text.as_str()),
+    };
+    let mut spans = vec![];
+    let mut w = 0;
+    for tag in done.split_whitespace() {
+        let fg = if form.is_known_tag(tag) {
+            c.accent
+        } else {
+            c.warn
+        };
+        let pill = format!(" {} ", tag.trim_start_matches('+'));
+        w += unicode_width::UnicodeWidthStr::width(pill.as_str()) + 1;
+        spans.push(Span::styled(pill, Style::new().fg(fg).bg(c.selection)));
+        spans.push(Span::raw(" "));
+    }
+    let typed = unicode_width::UnicodeWidthStr::width(typing);
+    let ghost = form.suggestion().unwrap_or("");
+    if w + typed + unicode_width::UnicodeWidthStr::width(ghost) >= width {
+        return None;
+    }
+    spans.push(Span::styled(typing.to_string(), Style::new().fg(c.fg)));
+    if !ghost.is_empty() {
+        spans.push(Span::styled(ghost.to_string(), Style::new().fg(c.dim)));
+    }
+    Some((spans, w + typed))
+}
+
 fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
     const LABEL: usize = 10;
     let today = dates::today();
@@ -1055,11 +1093,38 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
                 spans.push(preview);
             }
             Field::Tags => {
-                text_field(&form.tags, &mut spans, value_width.saturating_sub(24));
+                let width = value_width.saturating_sub(24);
+                match tag_pills(form, width, c) {
+                    Some((parts, cx)) => {
+                        spans.extend(parts);
+                        if focused {
+                            cursor = Some(Position {
+                                x: x0 + cx as u16,
+                                y,
+                            });
+                        }
+                    }
+                    None => text_field(&form.tags, &mut spans, width),
+                }
                 let from_title = tokens.as_ref().map(|q| q.tags.clone()).unwrap_or_default();
                 if !from_title.is_empty() {
                     let tags: Vec<String> = from_title.iter().map(|t| format!("+{t}")).collect();
                     spans.push(overrides(c, tags.join(" ")));
+                } else {
+                    // finished tags no task uses yet – likely a typo
+                    let text = &form.tags.text;
+                    let done = &text[..text.rfind(char::is_whitespace).map_or(0, |i| i + 1)];
+                    let new: Vec<&str> = done
+                        .split_whitespace()
+                        .filter(|t| !form.is_known_tag(t))
+                        .map(|t| t.trim_start_matches('+'))
+                        .collect();
+                    if !new.is_empty() {
+                        spans.push(Span::styled(
+                            format!("  {}", t!("form.new_tags", tags = new.join(" "))),
+                            Style::new().fg(c.warn),
+                        ));
+                    }
                 }
             }
             Field::Note if form.note_editable => text_field(&form.note, &mut spans, value_width),

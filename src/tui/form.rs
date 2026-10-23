@@ -191,7 +191,10 @@ impl Form {
             .as_ref()
             .and_then(|b| f.bucket_keys.iter().position(|k| k == b))
             .map_or(0, |i| i + 1);
-        f.tags = Input::with(&task.tags.join(" "));
+        // trailing space: the existing tags count as finished (pills), not as typed word
+        if !task.tags.is_empty() {
+            f.tags = Input::with(&format!("{} ", task.tags.join(" ")));
+        }
         f.note_editable = task.note_is_single_line();
         if f.note_editable {
             f.note = Input::with(task.note());
@@ -278,6 +281,27 @@ impl Form {
         true
     }
 
+    /// Backspace in the tags field with nothing typed yet removes the whole last tag.
+    fn remove_last_tag(&mut self) -> bool {
+        let input = &mut self.tags;
+        let before = &input.text[..input.byte_pos(input.cursor)];
+        if before.trim().is_empty() || !before.ends_with(char::is_whitespace) {
+            return false;
+        }
+        let kept = before.trim_end();
+        let kept = &kept[..kept.rfind(char::is_whitespace).map_or(0, |i| i + 1)];
+        let rest = input.text[before.len()..].to_string();
+        input.cursor = kept.chars().count();
+        input.text = format!("{kept}{rest}");
+        true
+    }
+
+    /// Whether `tag` (with or without `+`) is used by any task already.
+    pub fn is_known_tag(&self, tag: &str) -> bool {
+        let tag = tag.trim_start_matches('+').to_lowercase();
+        self.tag_names.contains(&tag)
+    }
+
     fn cycle(&mut self, delta: isize) {
         let wrap = |v: usize, n: usize| ((v as isize + delta).rem_euclid(n as isize)) as usize;
         match self.focused() {
@@ -298,6 +322,7 @@ impl Form {
             KeyCode::Tab | KeyCode::Down => self.focus = (self.focus + 1) % n,
             KeyCode::BackTab | KeyCode::Up => self.focus = (self.focus + n - 1) % n,
             KeyCode::Right if self.accept_suggestion() => {}
+            KeyCode::Backspace if self.focused() == Field::Tags && self.remove_last_tag() => {}
             _ if self.focused().is_text() => {
                 if let Some(input) = self.input_mut() {
                     input.handle(key);
@@ -389,6 +414,27 @@ mod tests {
         assert_eq!(f.suggestion(), Some("porting"));
         f.handle(key(KeyCode::Right));
         assert_eq!(f.tags.text, "dev reporting ");
+    }
+
+    #[test]
+    fn backspace_removes_whole_tag() {
+        let mut f = Form::new_task(&board(&[]), 0, None);
+        while f.focused() != Field::Tags {
+            f.handle(key(KeyCode::Tab));
+        }
+        typed(&mut f, "dev +ops re");
+        // a word being typed loses one character at a time
+        f.handle(key(KeyCode::Backspace));
+        assert_eq!(f.tags.text, "dev +ops r");
+        f.handle(key(KeyCode::Backspace));
+        assert_eq!(f.tags.text, "dev +ops ");
+        // then whole tags
+        f.handle(key(KeyCode::Backspace));
+        assert_eq!(f.tags.text, "dev ");
+        f.handle(key(KeyCode::Backspace));
+        assert_eq!((f.tags.text.as_str(), f.tags.cursor), ("", 0));
+        f.handle(key(KeyCode::Backspace));
+        assert_eq!(f.tags.text, "");
     }
 
     #[test]

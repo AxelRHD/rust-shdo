@@ -518,6 +518,9 @@ help.form.discard:
 help.form.tokens:
   en: "in the title: P1–P3, due:fri, @work"
   de: "im Titel: P1–P3, due:fr, @work"
+help.form.remove_tag:
+  en: "in the tags field: remove the whole last tag"
+  de: "im Tags-Feld: ganzen letzten Tag löschen"
 help.form.complete:
   en: "take over the suggested tag or bucket (grey)"
   de: "vorgeschlagenen Tag oder Bucket übernehmen (grau)"
@@ -1102,6 +1105,9 @@ help.tags.search:
 detail.tags:
   en: "Tags"
   de: "Tags"
+form.new_tags:
+  en: "new: %{tags}"
+  de: "neu: %{tags}"
 form.field.tags:
   en: "Tags"
   de: "Tags"
