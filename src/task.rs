@@ -26,6 +26,8 @@ pub struct Task {
     /// Status key; empty if not set in the frontmatter.
     pub status: String,
     pub bucket: Option<String>,
+    /// Free-form labels, lower case, without the `+`.
+    pub tags: Vec<String>,
     pub prio: Option<u8>,
     pub due: Option<Date>,
     pub created: Option<Timestamp>,
@@ -52,6 +54,7 @@ impl Task {
             status: status.into(),
             prio: None,
             bucket: None,
+            tags: Vec::new(),
             due: None,
             created: Some(ts),
             moved: Some(ts),
@@ -108,6 +111,7 @@ impl Task {
                 .map(str::trim)
                 .filter(|b| !b.is_empty())
                 .map(String::from),
+            tags: get_tags(&doc),
             prio,
             due: get_date(&doc, "due")?,
             created: get_timestamp(&doc, "created")?,
@@ -139,6 +143,21 @@ impl Task {
 
     pub fn prio_or_default(&self) -> u8 {
         self.prio.unwrap_or(PRIO_DEFAULT)
+    }
+
+    /// Sets the tags (normalized, without duplicates); no tags removes the field.
+    pub fn set_tags(&mut self, tags: &[String]) {
+        let tags = normalize_tags(tags.iter().map(String::as_str));
+        if tags.is_empty() {
+            self.doc.remove("tags");
+        } else {
+            self.doc["tags"] = value(
+                tags.iter()
+                    .map(String::as_str)
+                    .collect::<toml_edit::Array>(),
+            );
+        }
+        self.tags = tags;
     }
 
     pub fn set_bucket(&mut self, bucket: Option<&str>) {
@@ -235,6 +254,30 @@ impl Task {
 
     pub fn note(&self) -> &str {
         self.body.trim()
+    }
+}
+
+/// Lower case, without a leading `+`, no empty entries or duplicates, order kept.
+pub fn normalize_tags<'a>(tags: impl Iterator<Item = &'a str>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for tag in tags {
+        let tag = tag.trim().trim_start_matches('+').to_lowercase();
+        if !tag.is_empty() && !out.contains(&tag) {
+            out.push(tag);
+        }
+    }
+    out
+}
+
+/// `tags = ["dev", "ops"]`; a hand-written string such as `"dev, ops"` works too.
+fn get_tags(doc: &DocumentMut) -> Vec<String> {
+    match doc.get("tags") {
+        Some(item) => match (item.as_array(), item.as_str()) {
+            (Some(arr), _) => normalize_tags(arr.iter().filter_map(|v| v.as_str())),
+            (None, Some(s)) => normalize_tags(s.split([',', ' '])),
+            _ => Vec::new(),
+        },
+        None => Vec::new(),
     }
 }
 
@@ -377,6 +420,25 @@ Kundennr. 4711
         t.set_note("");
         assert!(!t.render().contains("bucket"));
         assert!(t.render().ends_with("+++\n"));
+    }
+
+    #[test]
+    fn tags_roundtrip() {
+        let mut t = sample();
+        assert!(t.tags.is_empty());
+        t.set_tags(&["Dev".into(), "+ops".into(), "dev".into(), " ".into()]);
+        assert_eq!(t.tags, ["dev", "ops"]);
+        let out = t.render();
+        assert!(out.contains("tags = [\"dev\", \"ops\"]"), "{out}");
+        let back = Task::parse("a3f9", PathBuf::from("a3f9.md"), &out).unwrap();
+        assert_eq!(back.tags, ["dev", "ops"]);
+        t.set_tags(&[]);
+        assert!(!t.render().contains("tags"));
+        let raw = "+++\ntitle = \"x\"\ntags = \"lvs, ops\"\n+++\n";
+        assert_eq!(
+            Task::parse("x", PathBuf::new(), raw).unwrap().tags,
+            ["lvs", "ops"]
+        );
     }
 
     #[test]

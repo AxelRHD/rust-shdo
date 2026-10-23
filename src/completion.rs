@@ -21,6 +21,10 @@ pub enum Kind {
     Buckets,
     /// Buckets as `@key` (quick add, `ls`)
     AtBuckets,
+    /// Tags in use as `+tag` (quick add, `ls`), with the number of open tasks
+    PlusTags,
+    /// Tags in use without `+` (for `shdo tag <id> …`)
+    Tags,
     /// `due:` shortcuts with the resolved date
     Due,
 }
@@ -67,12 +71,14 @@ function __shdo_complete --description 'shdo __complete using the --dir from the
     shdo $dir __complete $argv 2>/dev/null
 end
 
-complete -c shdo -n '__shdo_arg 1 done rm edit mv bucket' -f -a '(__shdo_complete ids)'
+complete -c shdo -n '__shdo_arg 1 done rm edit mv bucket tag' -f -a '(__shdo_complete ids)'
 complete -c shdo -n '__shdo_arg 2 mv' -f -a '(__shdo_complete statuses)'
 complete -c shdo -n '__shdo_arg 2 bucket' -f -a '(__shdo_complete buckets)'
 complete -c shdo -n '__shdo_arg 1 ls' -f -a '(__shdo_complete at-buckets)'
 complete -c shdo -n 'string match -q -- "@*" (commandline -ct)' -f -a '(__shdo_complete at-buckets)'
 complete -c shdo -n 'string match -q -- "due:*" (commandline -ct)' -f -a '(__shdo_complete due)'
+complete -c shdo -n 'string match -q -- "+*" (commandline -ct)' -f -a '(__shdo_complete plus-tags)'
+complete -c shdo -n '__fish_seen_subcommand_from tag; and test (__shdo_nargs) -ge 2' -f -a '(__shdo_complete tags)'
 "#;
 
 pub const SETUP_HELP: &str = "\
@@ -86,7 +92,7 @@ Then open a new shell. Run the command again after updating shdo so new
 commands and options are included.
 
 Fish additionally gets dynamic suggestions: task IDs with titles,
-statuses, buckets (@…) and due: values with dates. Bash, Zsh, Elvish
+statuses, buckets (@…), tags (+…) and due: values with dates. Bash, Zsh, Elvish
 and PowerShell complete commands and options.";
 
 /// Guide for `shdo completions` without a shell, pointing at the user's shell.
@@ -170,6 +176,19 @@ pub fn candidates(store: &Store, kind: Kind) -> Result<Vec<String>> {
             .iter()
             .map(|b| format!("@{}\t{}", b.key, b.name))
             .collect(),
+        Kind::PlusTags | Kind::Tags => {
+            let board = Board::load(store, &Filter::all())?;
+            let plus = if matches!(kind, Kind::PlusTags) {
+                "+"
+            } else {
+                ""
+            };
+            board
+                .tag_counts
+                .iter()
+                .map(|(t, n)| format!("{plus}{t}\t{n} open"))
+                .collect()
+        }
         Kind::Due => due_candidates(dates::today()),
     };
     Ok(lines)

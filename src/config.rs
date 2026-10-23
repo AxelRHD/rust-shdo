@@ -29,6 +29,9 @@ pub const DEFAULT_CONFIG: &str = r#"# shdo – settings for this machine (not sy
 # Bucket for new tasks when neither @bucket nor the filter decides (key, e.g. "work")
 # default_bucket = "work"
 
+# Shown tags (empty = no tag filter; a task matches if it has any), also set with `+`
+# tags = ["dev", "ops"]
+
 # Show the done column, also toggled with `v` in the board
 # show_done = true
 
@@ -56,6 +59,8 @@ pub struct AppConfig {
     pub show_calendar: Option<bool>,
     pub auto_sync: Option<bool>,
     pub default_bucket: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
     pub holidays: Option<String>,
 }
 

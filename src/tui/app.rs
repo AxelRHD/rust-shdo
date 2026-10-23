@@ -61,6 +61,12 @@ pub enum Mode {
         checked: Vec<bool>,
         original: Filter,
     },
+    /// Tag filter: entries are `board.tag_counts` in order.
+    TagFilter {
+        idx: usize,
+        checked: Vec<bool>,
+        original: Vec<String>,
+    },
     /// 0 = no bucket, otherwise index + 1.
     PickBucket {
         idx: usize,
@@ -169,6 +175,7 @@ impl App {
             });
         let filter = Filter {
             buckets: cfg.buckets.clone(),
+            tags: crate::task::normalize_tags(cfg.tags.iter().map(String::as_str)),
             ..Filter::default()
         };
         let show_done = cfg.show_done.unwrap_or(true);
@@ -473,6 +480,11 @@ impl App {
                 original,
             } => self.filter_key(key, idx, checked, original),
             Mode::PickBucket { idx } => self.pick_bucket_key(key, idx),
+            Mode::TagFilter {
+                idx,
+                checked,
+                original,
+            } => self.tag_filter_key(key, idx, checked, original),
             Mode::BucketNew {
                 name,
                 key: key_input,
@@ -555,6 +567,7 @@ impl App {
                 }
             }
             KeyCode::Char('f') => self.open_filter(),
+            KeyCode::Char('+') => self.open_tag_filter(),
             KeyCode::Char('v') => self.toggle_show_done(),
             KeyCode::Char('c') => self.toggle_calendar(),
             KeyCode::Char('b') => self.open_pick_bucket(),
@@ -708,6 +721,13 @@ impl App {
         }
         task.set_due(due);
         task.set_bucket(bucket.as_deref());
+        // Tags from the field plus any +tag in the title
+        let field_tags = crate::task::normalize_tags(form.tags.text.split_whitespace());
+        let tags: Vec<String> = field_tags
+            .into_iter()
+            .chain(q.tags.iter().cloned())
+            .collect();
+        task.set_tags(&tags);
         if form.note_editable {
             task.set_note(&form.note.text);
         }
@@ -859,13 +879,95 @@ impl App {
     }
 
     fn apply_filter(&mut self, filter: Filter) {
-        // The bucket filter never touches an active search
-        self.filter = Filter {
-            query: std::mem::take(&mut self.filter.query),
-            ..filter
-        };
+        // The bucket filter only changes buckets; search and tag filter stay
+        self.filter.buckets = filter.buckets;
         let keep = self.selected_id();
         self.reload(keep);
+    }
+
+    fn open_tag_filter(&mut self) {
+        let checked = self
+            .board
+            .tag_counts
+            .iter()
+            .map(|(t, _)| self.filter.tags.contains(t))
+            .collect();
+        self.mode = Mode::TagFilter {
+            idx: 0,
+            checked,
+            original: self.filter.tags.clone(),
+        };
+    }
+
+    /// Applies the tag selection right away (live preview), keeping the selected card.
+    fn set_tag_filter(&mut self, tags: Vec<String>) {
+        self.filter.tags = tags;
+        let keep = self.selected_id();
+        self.reload(keep);
+    }
+
+    fn checked_tags(&self, checked: &[bool]) -> Vec<String> {
+        self.board
+            .tag_counts
+            .iter()
+            .zip(checked)
+            .filter(|&(_, &on)| on)
+            .map(|((t, _), _)| t.clone())
+            .collect()
+    }
+
+    fn tag_filter_key(
+        &mut self,
+        key: KeyEvent,
+        idx: usize,
+        mut checked: Vec<bool>,
+        original: Vec<String>,
+    ) {
+        let n = checked.len().max(1);
+        let mut idx = idx;
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => idx = (idx + 1) % n,
+            KeyCode::Char('k') | KeyCode::Up => idx = (idx + n - 1) % n,
+            KeyCode::Char(' ') | KeyCode::Char('x') if !checked.is_empty() => {
+                checked[idx] = !checked[idx];
+                let tags = self.checked_tags(&checked);
+                self.set_tag_filter(tags);
+            }
+            KeyCode::Char('o') if !checked.is_empty() => {
+                checked
+                    .iter_mut()
+                    .enumerate()
+                    .for_each(|(i, c)| *c = i == idx);
+                let tags = self.checked_tags(&checked);
+                self.set_tag_filter(tags);
+            }
+            // Nothing checked means no tag filter: everything is shown
+            KeyCode::Char('a') => {
+                checked.iter_mut().for_each(|c| *c = false);
+                self.set_tag_filter(Vec::new());
+            }
+            KeyCode::Enter => {
+                let tags = self.checked_tags(&checked);
+                self.set_tag_filter(tags.clone());
+                let res = config::set_list(&self.cfg_path, "tags", &tags);
+                let label = self
+                    .board
+                    .tag_label()
+                    .unwrap_or_else(|| t!("msg.all").into_owned());
+                self.report(res, t!("msg.tag_filter", label = label));
+                return;
+            }
+            KeyCode::Esc | KeyCode::Char('q') => {
+                self.set_tag_filter(original);
+                return;
+            }
+            _ => {}
+        }
+        self.mode = Mode::TagFilter {
+            idx,
+            checked,
+            original,
+        };
     }
 
     fn filter_key(&mut self, key: KeyEvent, idx: usize, mut checked: Vec<bool>, original: Filter) {

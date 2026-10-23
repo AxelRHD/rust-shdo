@@ -64,6 +64,7 @@ pub enum Field {
     Prio,
     Due,
     Bucket,
+    Tags,
     Note,
 }
 
@@ -75,13 +76,14 @@ impl Field {
             Field::Prio => "form.field.prio",
             Field::Due => "form.field.due",
             Field::Bucket => "form.field.bucket",
+            Field::Tags => "form.field.tags",
             Field::Note => "form.field.note",
         };
         t!(key).into_owned()
     }
 
     pub fn is_text(self) -> bool {
-        matches!(self, Field::Title | Field::Due | Field::Note)
+        matches!(self, Field::Title | Field::Due | Field::Tags | Field::Note)
     }
 }
 
@@ -111,6 +113,8 @@ pub struct Form {
     pub bucket_keys: Vec<String>,
     /// The bucket was taken over from the filter and not touched yet.
     pub origin: Option<BucketOrigin>,
+    /// Space-separated, `+` optional.
+    pub tags: Input,
     pub note: Input,
     /// Multi-line notes can only be edited in the editor.
     pub note_editable: bool,
@@ -122,6 +126,7 @@ impl Form {
         if !board.buckets.is_empty() {
             fields.push(Field::Bucket);
         }
+        fields.push(Field::Tags);
         fields.push(Field::Note);
         Form {
             editing: None,
@@ -136,6 +141,7 @@ impl Form {
             bucket_names: board.buckets.iter().map(|b| b.name.clone()).collect(),
             bucket_keys: board.buckets.iter().map(|b| b.key.clone()).collect(),
             origin: None,
+            tags: Input::default(),
             note: Input::default(),
             note_editable: true,
         }
@@ -175,6 +181,7 @@ impl Form {
             .as_ref()
             .and_then(|b| f.bucket_keys.iter().position(|k| k == b))
             .map_or(0, |i| i + 1);
+        f.tags = Input::with(&task.tags.join(" "));
         f.note_editable = task.note_is_single_line();
         if f.note_editable {
             f.note = Input::with(task.note());
@@ -203,6 +210,7 @@ impl Form {
         match self.focused() {
             Field::Title => Some(&mut self.title),
             Field::Due => Some(&mut self.due),
+            Field::Tags => Some(&mut self.tags),
             Field::Note if self.note_editable => Some(&mut self.note),
             _ => None,
         }
@@ -282,7 +290,7 @@ mod tests {
     #[test]
     fn navigation_and_choices() {
         let mut f = Form::new_task(&board(&["work"]), 0, None);
-        assert_eq!(f.fields.len(), 6);
+        assert_eq!(f.fields.len(), 7);
         for ch in "Hallo h".chars() {
             f.handle(key(KeyCode::Char(ch)));
         }

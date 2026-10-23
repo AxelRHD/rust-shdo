@@ -71,6 +71,15 @@ const HELP: &[(&str, &[(&str, &str)])] = &[
         ],
     ),
     (
+        "help.tags",
+        &[
+            ("+tag", "help.tags.add"),
+            ("+", "help.tags.filter"),
+            ("Space / o / a", "help.tags.keys"),
+            ("/+dev", "help.tags.search"),
+        ],
+    ),
+    (
         "help.general",
         &[
             ("/", "help.general.search"),
@@ -136,6 +145,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::Form(form) => draw_form(f, app, &c, form),
         Mode::Filter { idx, checked, .. } => draw_filter(f, app, &c, *idx, checked),
         Mode::PickBucket { idx } => draw_pick_bucket(f, app, &c, *idx),
+        Mode::TagFilter { idx, checked, .. } => draw_tag_filter(f, app, &c, *idx, checked),
         Mode::BucketNew {
             name,
             key,
@@ -199,6 +209,10 @@ fn draw_header(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
     }
     if let Some(filter) = filter {
         right.push(Span::styled(filter, Style::new().fg(c.key).bold()));
+        right.push(Span::styled(" · ", Style::new().fg(c.dim)));
+    }
+    if let Some(tags) = app.board.tag_label() {
+        right.push(Span::styled(tags, Style::new().fg(c.accent).bold()));
         right.push(Span::styled(" · ", Style::new().fg(c.dim)));
     }
     right.push(Span::styled(
@@ -417,6 +431,10 @@ fn card_lines<'a>(t: &'a Task, c: &Palette, selected: bool, ctx: &CardCtx) -> Ve
     {
         parts.push((1, Span::styled(format!("@{b}"), Style::new().fg(c.key))));
     }
+    if !t.tags.is_empty() {
+        let tags: Vec<String> = t.tags.iter().map(|tag| format!("+{tag}")).collect();
+        parts.push((2, Span::styled(tags.join(" "), Style::new().fg(c.accent))));
+    }
     const INDENT: &str = "     ";
     let avail = (width as usize).saturating_sub(INDENT.len());
     let total = |parts: &[(u8, Span)]| {
@@ -541,6 +559,7 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
                     "kb.buckets"
                 },
             ));
+            k.push(("+", "kb.tags"));
             if has_buckets {
                 k.push(("b", "kb.bucket"));
             }
@@ -599,6 +618,14 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
         Mode::BucketDelete { .. } | Mode::BucketMove { .. } => {
             vec![("j/k", "kb.select"), ("⏎", "kb.run"), ("Esc", "kb.cancel")]
         }
+        Mode::TagFilter { .. } => vec![
+            ("j/k", "kb.select"),
+            ("Space", "kb.toggle"),
+            ("o", "kb.only"),
+            ("a", "kb.no_tag_filter"),
+            ("⏎", "kb.save"),
+            ("Esc", "kb.discard"),
+        ],
         Mode::PickBucket { .. } => {
             vec![("j/k", "kb.select"), ("⏎", "kb.set"), ("Esc", "kb.cancel")]
         }
@@ -783,6 +810,10 @@ fn draw_detail(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
             format!("{} (@{b})", app.board.bucket_name(b)),
         ));
     }
+    if !t.tags.is_empty() {
+        let tags: Vec<String> = t.tags.iter().map(|tag| format!("+{tag}")).collect();
+        lines.push(field(&t!("detail.tags"), tags.join(" ")));
+    }
     if let Some(d) = t.due {
         lines.push(field(
             &t!("detail.due"),
@@ -947,6 +978,14 @@ fn draw_form(f: &mut Frame, app: &App, c: &Palette, form: &Form) {
                 spans.push(Span::raw(" ".repeat(w.saturating_sub(used))));
                 spans.push(preview);
             }
+            Field::Tags => {
+                text_field(&form.tags, &mut spans, value_width.saturating_sub(24));
+                let from_title = tokens.as_ref().map(|q| q.tags.clone()).unwrap_or_default();
+                if !from_title.is_empty() {
+                    let tags: Vec<String> = from_title.iter().map(|t| format!("+{t}")).collect();
+                    spans.push(overrides(c, tags.join(" ")));
+                }
+            }
             Field::Note if form.note_editable => text_field(&form.note, &mut spans, value_width),
             Field::Note => spans.push(Span::styled(
                 t!("form.note_multiline").into_owned(),
@@ -1016,6 +1055,7 @@ fn title_hint(
     let has_token = text.split_whitespace().any(|w| {
         w.starts_with("due:")
             || (w.starts_with('@') && w.len() > 1)
+            || (w.starts_with('+') && w[1..].starts_with(char::is_alphabetic))
             || matches!(w, "P1" | "P2" | "P3" | "p1" | "p2" | "p3")
     });
     if !has_token {
@@ -1058,6 +1098,9 @@ fn title_hint(
                 ]);
             }
         }
+    }
+    for tag in &q.tags {
+        parts.push(format!("+{tag}"));
     }
     Line::from(vec![
         pad,
@@ -1293,6 +1336,50 @@ fn draw_bucket_move(f: &mut Frame, app: &App, c: &Palette, key: &str, idx: usize
     let title = t!("bucket.move_title", name = app.board.bucket_name(key)).into_owned();
     let inner = popup(f, c, &title, 48, lines.len() as u16 + 2);
     f.render_widget(Paragraph::new(lines), inner);
+}
+
+fn draw_tag_filter(f: &mut Frame, app: &App, c: &Palette, idx: usize, checked: &[bool]) {
+    let mut lines: Vec<Line> = app
+        .board
+        .tag_counts
+        .iter()
+        .enumerate()
+        .map(|(i, (tag, n))| {
+            let sel = i == idx;
+            let on = checked.get(i).copied().unwrap_or(false);
+            Line::from(vec![
+                Span::styled(
+                    if sel { "→ " } else { "  " },
+                    Style::new().fg(c.border_active),
+                ),
+                Span::styled(
+                    if on { "[x] " } else { "[ ] " },
+                    Style::new().fg(if on { c.done } else { c.dim }),
+                ),
+                Span::styled(
+                    format!("{:<20}", truncate(&format!("+{tag}"), 20)),
+                    if sel {
+                        Style::new().bold()
+                    } else {
+                        Style::new()
+                    },
+                ),
+                Span::styled(format!("{n:>4}"), Style::new().fg(c.dim)),
+            ])
+        })
+        .collect();
+    let hint = if lines.is_empty() {
+        t!("tagfilter.no_tags")
+    } else {
+        t!("tagfilter.hint")
+    };
+    lines.push(Line::default());
+    lines.push(Line::from(Span::styled(
+        format!("  {hint}"),
+        Style::new().fg(c.dim),
+    )));
+    let inner = popup(f, c, &t!("tagfilter.title"), 42, lines.len() as u16 + 2);
+    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
 }
 
 fn draw_pick_bucket(f: &mut Frame, app: &App, c: &Palette, idx: usize) {

@@ -57,11 +57,17 @@ enum Cmd {
         /// Show all buckets
         #[arg(short, long)]
         all: bool,
-        /// Show only this bucket (e.g. @work)
-        bucket: Option<String>,
+        /// Show only these buckets and tags for once, e.g. `@work +dev`
+        filters: Vec<String>,
     },
     /// Set a task's bucket ("-" removes it)
     Bucket { id: String, bucket: String },
+    /// Set a task's tags, e.g. `shdo tag a3f dev ops` ("-" removes all)
+    Tag {
+        id: String,
+        #[arg(required = true)]
+        tags: Vec<String>,
+    },
     /// Mark a task as done (last status)
     Done { id: String },
     /// Set a task's status (key or name, a prefix is enough)
@@ -104,6 +110,7 @@ const SUBCOMMANDS: &[&str] = &[
     "init",
     "setup",
     "bucket",
+    "tag",
     "completions",
 ];
 
@@ -162,20 +169,31 @@ fn run() -> Result<()> {
             add(&store, &filter, cfg.default_bucket.as_deref(), &text)
         }
         Cmd::Ls { all: true, .. } => ls(&store, &all),
-        Cmd::Ls {
-            bucket: Some(b), ..
-        } => {
+        Cmd::Ls { filters, .. } if !filters.is_empty() => {
+            // `@bucket` and `+tag` given on the command line replace the saved filter
             let cfg = store.board_config()?;
-            let key = board::resolve_bucket(&cfg.buckets, &b)?;
-            ls(
-                &store,
-                &Filter {
-                    buckets: vec![key],
-                    ..Filter::default()
-                },
-            )
+            let mut once = Filter::default();
+            for f in &filters {
+                match f.strip_prefix('+') {
+                    Some(tag) => once.tags.extend(task::normalize_tags(std::iter::once(tag))),
+                    None => once.buckets.push(board::resolve_bucket(&cfg.buckets, f)?),
+                }
+            }
+            ls(&store, &once)
         }
         Cmd::Ls { .. } => ls(&store, &filter),
+        Cmd::Tag { id, tags } => {
+            let mut task = store.find(&id)?;
+            let tags = if tags == ["-"] { Vec::new() } else { tags };
+            task.set_tags(&tags);
+            task.save()?;
+            let shown: Vec<String> = task.tags.iter().map(|t| format!("+{t}")).collect();
+            match shown.is_empty() {
+                true => println!("{}  {}  no tags", task.id, task.title),
+                false => println!("{}  {}  {}", task.id, task.title, shown.join(" ")),
+            }
+            Ok(())
+        }
         Cmd::Bucket { id, bucket } => {
             let mut task = store.find(&id)?;
             let cfg = store.board_config()?;
@@ -315,6 +333,7 @@ fn add(
     task.set_prio(q.prio);
     task.set_due(q.due);
     task.set_bucket(bucket.as_deref());
+    task.set_tags(&q.tags);
     task.save()?;
     match picked {
         Some((b, board::BucketOrigin::Filter)) => {
@@ -349,7 +368,12 @@ fn ls(store: &Store, filter: &Filter) -> Result<()> {
     };
     let today = dates::today();
     let last = board.last_index();
-    if let Some(label) = board.filter_label() {
+    let label = [board.filter_label(), board.tag_label()]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    if !label.is_empty() {
+        let label = label.join(" · ");
         println!(
             "{}",
             paint(
@@ -393,10 +417,13 @@ fn ls(store: &Store, filter: &Filter) -> Result<()> {
             };
             let when = format!("{when:<10}");
             let when = if overdue { paint("31", &when) } else { when };
-            let bucket = match (&t.bucket, show_bucket) {
+            let mut bucket = match (&t.bucket, show_bucket) {
                 (Some(b), true) => format!("  {}", paint("35", &format!("@{b}"))),
                 _ => String::new(),
             };
+            for tag in &t.tags {
+                bucket.push_str(&format!(" {}", paint("36", &format!("+{tag}"))));
+            }
             println!(
                 "  {}  {prio}  {when}  {}{bucket}",
                 paint("2", &format!("{:<6}", t.id)),
@@ -479,14 +506,12 @@ mod tests {
         assert!(matches!(cli.cmd, Some(Cmd::Ls { .. })));
         assert!(Cli::try_parse_from(["shdo"]).unwrap().cmd.is_none());
         let cli = Cli::try_parse_from(["shdo", "ls", "-a"]).unwrap();
-        assert!(matches!(
-            cli.cmd,
-            Some(Cmd::Ls {
-                all: true,
-                bucket: None
-            })
-        ));
+        assert!(matches!(cli.cmd, Some(Cmd::Ls { all: true, .. })));
         let cli = Cli::try_parse_from(["shdo", "ls", "@work"]).unwrap();
-        assert!(matches!(cli.cmd, Some(Cmd::Ls { bucket: Some(b), .. }) if b == "@work"));
+        assert!(matches!(cli.cmd, Some(Cmd::Ls { filters, .. }) if filters == ["@work"]));
+        let cli = Cli::try_parse_from(["shdo", "ls", "@work", "+dev"]).unwrap();
+        assert!(matches!(cli.cmd, Some(Cmd::Ls { filters, .. }) if filters == ["@work", "+dev"]));
+        let cli = Cli::try_parse_from(["shdo", "tag", "a3f", "dev", "ops"]).unwrap();
+        assert!(matches!(cli.cmd, Some(Cmd::Tag { tags, .. }) if tags == ["dev", "ops"]));
     }
 }

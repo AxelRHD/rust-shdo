@@ -16,8 +16,10 @@ pub const NO_BUCKET: &str = "-";
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Filter {
     pub buckets: Vec<String>,
-    /// Case-insensitive search in title, note and ID; empty = no search.
+    /// Case-insensitive search in title, note, tags and ID; empty = no search.
     pub query: String,
+    /// Shown tags: a task matches if it has any of them. Empty = no tag filter.
+    pub tags: Vec<String>,
 }
 
 impl Filter {
@@ -50,8 +52,20 @@ impl Filter {
         if query.is_empty() {
             return true;
         }
-        let haystack = format!("{}\n{}\n{}", task.title, task.note(), task.id).to_lowercase();
+        let tags: Vec<String> = task.tags.iter().map(|t| format!("+{t}")).collect();
+        let haystack = format!(
+            "{}\n{}\n{}\n{}",
+            task.title,
+            task.note(),
+            task.id,
+            tags.join(" ")
+        )
+        .to_lowercase();
         query.split_whitespace().all(|word| haystack.contains(word))
+    }
+
+    fn matches_tags(&self, task: &Task) -> bool {
+        self.tags.is_empty() || task.tags.iter().any(|t| self.tags.contains(t))
     }
 
     /// If exactly one real bucket is selected, new tasks inherit it. "No bucket" does not
@@ -81,6 +95,8 @@ pub struct Board {
     pub filter: Filter,
     /// Open tasks per bucket (order as in `buckets`, then "none"), unfiltered.
     pub bucket_counts: Vec<usize>,
+    /// All tags in use with the number of open tasks carrying them, sorted by name.
+    pub tag_counts: Vec<(String, usize)>,
     /// Open tasks hidden by the filter.
     pub hidden: usize,
     pub warnings: Vec<String>,
@@ -112,6 +128,7 @@ impl Board {
             .collect();
         let last = columns.len() - 1;
         let mut bucket_counts = vec![0; cfg.buckets.len() + 1];
+        let mut tag_counts: std::collections::BTreeMap<String, usize> = Default::default();
         let mut hidden = 0;
         for task in tasks {
             let idx = match columns.iter().position(|c| c.def.key == task.status) {
@@ -140,10 +157,13 @@ impl Board {
                 }
             };
             let key = bucket_idx.map_or(NO_BUCKET, |i| cfg.buckets[i].key.as_str());
+            for tag in &task.tags {
+                *tag_counts.entry(tag.clone()).or_default() += usize::from(idx != last);
+            }
             if idx != last {
                 bucket_counts[bucket_idx.unwrap_or(cfg.buckets.len())] += 1;
             }
-            if !filter.matches(key) || !filter.matches_query(&task) {
+            if !filter.matches(key) || !filter.matches_tags(&task) || !filter.matches_query(&task) {
                 if idx != last {
                     hidden += 1;
                 }
@@ -159,6 +179,7 @@ impl Board {
             buckets: cfg.buckets,
             filter,
             bucket_counts,
+            tag_counts: tag_counts.into_iter().collect(),
             hidden,
             warnings,
         }
@@ -193,6 +214,15 @@ impl Board {
             .iter()
             .find(|b| b.key == key)
             .map_or(key, |b| b.name.as_str())
+    }
+
+    /// Short description of the tag filter, e.g. "+dev +ops".
+    pub fn tag_label(&self) -> Option<String> {
+        if self.filter.tags.is_empty() {
+            return None;
+        }
+        let tags: Vec<String> = self.filter.tags.iter().map(|t| format!("+{t}")).collect();
+        Some(tags.join(" "))
     }
 
     /// Short description of the filter, e.g. "Work" or "Home, no bucket".
@@ -420,6 +450,46 @@ mod tests {
 
     fn bucket_task(id: &str, bucket: &str) -> Task {
         task(id, &format!("bucket = \"{bucket}\""))
+    }
+
+    #[test]
+    fn tag_filter_and_counts() {
+        let cfg = parse_board("").unwrap();
+        let tasks = || {
+            vec![
+                task("a", "tags = [\"dev\"]"),
+                task("b", "tags = [\"ops\", \"dev\"]"),
+                task("c", "tags = [\"lvs\"]"),
+                task("d", ""),
+            ]
+        };
+        let all = Board::build(cfg.clone(), tasks(), vec![], Filter::all());
+        assert_eq!(
+            all.tag_counts,
+            [
+                ("dev".to_string(), 2),
+                ("lvs".to_string(), 1),
+                ("ops".to_string(), 1)
+            ]
+        );
+        assert_eq!(all.tag_label(), None);
+        let f = Filter {
+            tags: vec!["ops".into(), "lvs".into()],
+            ..Filter::default()
+        };
+        let b = Board::build(cfg.clone(), tasks(), vec![], f);
+        assert_eq!(ids(&b.columns[0].tasks), ["b", "c"]);
+        assert_eq!(b.hidden, 2);
+        assert_eq!(b.tag_label().as_deref(), Some("+ops +lvs"));
+        // the search also finds tags
+        let q = Filter {
+            query: "+lvs".into(),
+            ..Filter::default()
+        };
+        assert_eq!(
+            ids(&Board::build(cfg, tasks(), vec![], q).columns[0].tasks),
+            ["c"]
+        );
     }
 
     #[test]

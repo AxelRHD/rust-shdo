@@ -1,4 +1,4 @@
-//! Quick-add syntax: `Pay invoice P1 due:fr @work`.
+//! Quick-add syntax: `Pay invoice P1 due:fr @work +finance`.
 //! Shared by the CLI and the TUI form.
 
 use anyhow::{Result, bail};
@@ -14,6 +14,8 @@ pub struct QuickAdd {
     pub due: Option<Date>,
     /// Raw input after `@`; resolved against the buckets in `shdo.toml`.
     pub bucket: Option<String>,
+    /// Words after `+`, normalized.
+    pub tags: Vec<String>,
 }
 
 pub fn parse(words: &[String], today: Date) -> Result<QuickAdd> {
@@ -21,6 +23,7 @@ pub fn parse(words: &[String], today: Date) -> Result<QuickAdd> {
     let mut prio = None;
     let mut due = None;
     let mut bucket = None;
+    let mut tags = Vec::new();
     for word in words.iter().flat_map(|w| w.split_whitespace()) {
         if let Some(p) = parse_prio(word) {
             prio = Some(p);
@@ -28,6 +31,8 @@ pub fn parse(words: &[String], today: Date) -> Result<QuickAdd> {
             due = Some(dates::parse_date(d, today)?);
         } else if let Some(b) = word.strip_prefix('@').filter(|b| !b.is_empty()) {
             bucket = Some(b.to_string());
+        } else if let Some(tag) = word.strip_prefix('+').filter(|t| is_tag(t)) {
+            tags.push(tag);
         } else {
             title.push(word);
         }
@@ -40,11 +45,20 @@ pub fn parse(words: &[String], today: Date) -> Result<QuickAdd> {
         prio,
         due,
         bucket,
+        tags: crate::task::normalize_tags(tags.into_iter()),
     })
 }
 
 pub fn parse_str(input: &str, today: Date) -> Result<QuickAdd> {
     parse(&[input.to_string()], today)
+}
+
+/// A tag starts with a letter, so `+3d` or a lone `+` stay in the title.
+fn is_tag(word: &str) -> bool {
+    word.chars().next().is_some_and(char::is_alphabetic)
+        && word
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
 }
 
 fn parse_prio(word: &str) -> Option<u8> {
@@ -76,7 +90,8 @@ mod tests {
                 title: "Rechnung bezahlen".into(),
                 prio: None,
                 due: None,
-                bucket: None
+                bucket: None,
+                tags: vec![]
             }
         );
     }
@@ -114,6 +129,16 @@ mod tests {
         let q = parse(&words("Mail an x @ y"), TODAY).unwrap();
         assert_eq!(q.title, "Mail an x @ y");
         assert_eq!(q.bucket, None);
+    }
+
+    #[test]
+    fn tag_tokens() {
+        let q = parse(&words("Deploy fixen +ops +Dev @work"), TODAY).unwrap();
+        assert_eq!(q.title, "Deploy fixen");
+        assert_eq!(q.tags, ["ops", "dev"]);
+        let q = parse(&words("Plus +3d und + bleiben"), TODAY).unwrap();
+        assert_eq!(q.title, "Plus +3d und + bleiben");
+        assert!(q.tags.is_empty());
     }
 
     #[test]

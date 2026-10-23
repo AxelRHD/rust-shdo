@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0 - 2026-10-23
+
+- Tags: `+dev` in the title or the form's tag field, any number per task, stored as
+  `tags = [...]`; shown on cards, in the details and in `shdo ls`
+- Tag filter with `+`: show tasks with any of the checked tags, saved per machine,
+  combines with the bucket filter and the search (which also finds `+tag`)
+- CLI: `shdo tag <id> <tags…>`, `shdo ls @work +dev` for a one-off filter, fish
+  completion for `+tag`
+- `default_bucket` in config.toml: new tasks get it when neither `@bucket` nor the
+  filter decides
+- A filter showing one bucket plus "no bucket" now passes that bucket on to new tasks
+- The setup dialog offers home and work buckets for a new board; the default
+  shdo.toml no longer contains a commented bucket example
+- The form hint mentions `@bucket` only when buckets exist
+
 ## 0.3.1 - 2026-10-22
 
 - New values in config.toml (from the setup, the theme picker or the toggles) replace

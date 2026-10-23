@@ -657,8 +657,8 @@ form.from_filter:
   en: "taken from the filter"
   de: "aus Filter übernommen"
 form.tokens_hint:
-  en: "P1–P3 · due:fri · @bucket work in the title too"
-  de: "P1–P3 · due:fr · @bucket im Titel gehen auch"
+  en: "P1–P3 · due:fri · @bucket · +tag work in the title too"
+  de: "P1–P3 · due:fr · @bucket · +tag im Titel gehen auch"
 form.recognized:
   en: "recognized: %{parts}"
   de: "erkannt: %{parts}"
@@ -1070,5 +1070,44 @@ form.default_bucket:
   en: "default bucket (settings)"
   de: "Standard-Bucket (Einstellungen)"
 form.tokens_hint_no_buckets:
-  en: "P1–P3 · due:fri work in the title too"
-  de: "P1–P3 · due:fr im Titel gehen auch"
+  en: "P1–P3 · due:fri · +tag work in the title too"
+  de: "P1–P3 · due:fr · +tag im Titel gehen auch"
+kb.tags:
+  en: "tags"
+  de: "Tags"
+kb.no_tag_filter:
+  en: "no tag filter"
+  de: "kein Tag-Filter"
+help.tags:
+  en: "Tags"
+  de: "Tags"
+help.tags.add:
+  en: "in the title or the form: any number of tags per task"
+  de: "im Titel oder im Formular: beliebig viele Tags je Task"
+help.tags.filter:
+  en: "tag filter: show tasks with any of the checked tags"
+  de: "Tag-Filter: Tasks mit einem der angekreuzten Tags zeigen"
+help.tags.keys:
+  en: "in the tag filter: on/off, only this, no tag filter"
+  de: "im Tag-Filter: an/aus, nur dieser, kein Tag-Filter"
+help.tags.search:
+  en: "the search finds tags too"
+  de: "die Suche findet auch Tags"
+detail.tags:
+  en: "Tags"
+  de: "Tags"
+form.field.tags:
+  en: "Tags"
+  de: "Tags"
+msg.tag_filter:
+  en: "tag filter: %{label}"
+  de: "Tag-Filter: %{label}"
+tagfilter.title:
+  en: "Filter · Tags"
+  de: "Filter · Tags"
+tagfilter.hint:
+  en: "nothing checked = all tasks"
+  de: "nichts angekreuzt = alle Tasks"
+tagfilter.no_tags:
+  en: "no tags yet – add +tag to a title"
+  de: "noch keine Tags – +tag im Titel anlegen"

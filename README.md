@@ -36,6 +36,7 @@ just files you can read, edit and diff.
 - Form for new and edited tasks with a live preview of recognized dates
 - **Buckets** such as *home* and *work*, with a per-machine filter: show work tasks on
   the work laptop and home tasks at home, from the same repository
+- **Tags** such as `+dev`, `+ops` across buckets, with their own filter
 - **Calendar sidebar** with the number of tasks due per day and public holidays
   (Germany, all federal states)
 - Markdown notes with checklists (`☐ 1/3` on the card)
@@ -104,6 +105,7 @@ them.
 | `⏎` | details with notes |
 | `/` | search titles, notes and IDs (live; `Esc` clears) |
 | `f` | bucket filter; create, rename and delete buckets |
+| `+` | tag filter: show tasks with any of the checked tags |
 | `v` / `c` | show or hide the done column / the calendar |
 | `s` | sync with the git remote |
 | `t` | choose a theme |
@@ -115,12 +117,14 @@ them.
 The command line is always English and meant for quick capture and scripts.
 
 ```sh
-shdo Pay invoice P1 due:fri @work   # new task; P1–P3, due: and @bucket anywhere
+shdo Deploy check +ops due:fri @work  # new task; P1–P3, due:, @bucket, +tag anywhere
 shdo -- ls is broken                # title that starts with a command name
 shdo ls                             # board as text (honours the bucket filter, -a for all)
 shdo done a3f                       # IDs can be shortened while unique
 shdo mv a3f doing                   # status by key or name
 shdo bucket a3f home                # set a bucket, "-" removes it
+shdo tag a3f dev ops                # set tags, "-" removes them
+shdo ls @work +dev                  # show only these, once
 shdo edit a3f                       # open the file in $EDITOR
 shdo sync                           # git add, commit, pull --rebase, push
 shdo archive                        # move done tasks to archive/
@@ -140,6 +144,7 @@ status = "todo"
 prio = 1
 due = 2026-10-26
 bucket = "work"
+tags = ["finance"]
 created = 2026-10-22T10:41:00+02:00
 moved = 2026-10-22T10:41:00+02:00
 +++
@@ -167,6 +172,8 @@ dir = "~/.local/share/shdo"
 editor = "hx"            # defaults to $VISUAL, then $EDITOR
 theme = "nord"
 buckets = ["work"]       # shown buckets; empty = all
+default_bucket = "work"  # bucket for new tasks when the filter does not decide
+tags = ["dev", "ops"]    # shown tags; empty = no tag filter
 holidays = "de-bw"       # empty = none
 show_done = true
 show_calendar = true
