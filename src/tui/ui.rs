@@ -730,6 +730,7 @@ fn draw_help(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
     )));
     let files = [
         ("help.files.config", tilde_path(app.cfg_path())),
+        ("help.files.state", tilde_path(&crate::state::path())),
         ("help.files.data", tilde_path(&app.store.dir)),
         (
             "help.files.themes",

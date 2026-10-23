@@ -156,30 +156,30 @@ Numbers are in the shared drive.
 ```
 
 The data directory contains `shdo.toml` with the statuses and buckets, `tasks/` and
-`archive/`. Statuses and buckets have a stable `key` used in the files and an optional `name`
-that is only displayed, so renaming never touches your tasks. Without a name, the
-standard keys (todo, doing, wait, done, home, work) appear in the board's language. Comments and unknown fields in
-these files are preserved when shdo writes them.
+`archive/`. Statuses and buckets have a stable `key` used in the files and an optional
+`name` that is only displayed, so renaming never touches your tasks. Without a name,
+the standard keys (todo, doing, wait, done, home, work) appear in the board's language.
+Comments and unknown fields in these files are preserved when shdo writes them.
 
 ## Configuration
 
-Per-machine settings live in `~/.config/shdo/config.toml` and are written by the setup,
-the theme picker and the filter:
+Per-machine settings live in `~/.config/shdo/config.toml`. Most of them can be changed
+on the settings page (`,`); the setup and the theme picker write there too:
 
 ```toml
 language = "en"          # "en" or "de"
 dir = "~/.local/share/shdo"
 editor = "hx"            # defaults to $VISUAL, then $EDITOR
 theme = "nord"
-buckets = ["work"]       # shown buckets; empty = all
 default_bucket = "work"  # bucket for new tasks when the filter does not decide
 done_days = 14           # show done tasks of the last 14 days; 0 = all
-tags = ["dev", "ops"]    # shown tags; empty = no tag filter
-holidays = "de-bw"       # empty = none
-show_done = true
-show_calendar = true
 auto_sync = false        # sync when the board opens and before it closes
+holidays = "de-bw"       # empty = none
 ```
+
+What the board remembers by itself – the bucket and tag filter, whether the done column
+and the calendar are shown – is kept separately in `~/.local/state/shdo/state.toml`
+(`$XDG_STATE_HOME`). It is safe to delete; the board then starts with the default view.
 
 With `auto_sync = true` the board syncs once in the background when it opens and once
 when you quit – only if there is something to send. It never syncs on every change;

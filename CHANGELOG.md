@@ -11,6 +11,9 @@
 - The tag filter moved into the filter popup (`f`): `←`/`→` switches between buckets
   and tags, Enter saves both, Esc restores both; `+` still jumps to the tags
 - The header no longer mentions a hidden done column when it is empty
+- View state (bucket and tag filter, done column, calendar) moved from config.toml to
+  `~/.local/state/shdo/state.toml`; config.toml keeps only settings. Existing values are
+  moved automatically on the first start
 - `name` is optional for statuses and buckets in shdo.toml: without one, todo, doing,
   wait, done, home and work are shown in the board's language (other keys as the key).
   New boards are written without names; the settings page can open shdo.toml

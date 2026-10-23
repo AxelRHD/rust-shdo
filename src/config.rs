@@ -23,23 +23,11 @@ pub const DEFAULT_CONFIG: &str = r#"# shdo – settings for this machine (not sy
 # Theme, also set with `t` in the board
 # theme = "tokyonight"
 
-# Shown buckets (empty = all, "-" = no bucket), also set with `f` in the board
-# buckets = ["work"]
-
 # Bucket for new tasks when neither @bucket nor the filter decides (key, e.g. "work")
 # default_bucket = "work"
 
 # Show done tasks of the last N days (0 = all); `shdo archive` archives older ones
 # done_days = 14
-
-# Shown tags (empty = no tag filter; a task matches if it has any), also set with `+`
-# tags = ["dev", "ops"]
-
-# Show the done column, also toggled with `v` in the board
-# show_done = true
-
-# Show the calendar sidebar, also toggled with `c` in the board
-# show_calendar = true
 
 # Sync with the git remote when the board opens and before it closes
 # (never on every change); `s` syncs in between
@@ -48,6 +36,9 @@ pub const DEFAULT_CONFIG: &str = r#"# shdo – settings for this machine (not sy
 # Public holidays in the calendar: country-state, e.g. "de-bw"; empty = none
 # (states: bw, by, be, bb, hb, hh, he, mv, ni, nw, rp, sl, sn, st, sh, th)
 # holidays = "de-bw"
+
+# What the board remembers by itself (filters, shown columns, calendar) is not kept
+# here but in ~/.local/state/shdo/state.toml.
 "#;
 
 #[derive(Debug, Default, serde::Deserialize)]
@@ -56,15 +47,9 @@ pub struct AppConfig {
     pub dir: Option<String>,
     pub editor: Option<String>,
     pub theme: Option<String>,
-    #[serde(default)]
-    pub buckets: Vec<String>,
-    pub show_done: Option<bool>,
-    pub show_calendar: Option<bool>,
     pub auto_sync: Option<bool>,
     pub default_bucket: Option<String>,
     pub done_days: Option<u32>,
-    #[serde(default)]
-    pub tags: Vec<String>,
     pub holidays: Option<String>,
 }
 
@@ -189,16 +174,6 @@ pub fn set_bool(path: &Path, key: &str, val: bool) -> Result<()> {
     update(path, |doc| doc[key] = value(val))
 }
 
-pub fn set_list(path: &Path, key: &str, vals: &[String]) -> Result<()> {
-    update(path, |doc| {
-        doc[key] = value(
-            vals.iter()
-                .map(String::as_str)
-                .collect::<toml_edit::Array>(),
-        )
-    })
-}
-
 /// Result of the setup dialog.
 pub struct Setup {
     pub language: Lang,
@@ -233,9 +208,18 @@ pub fn contract_tilde(p: &Path) -> String {
 }
 
 fn update(path: &Path, f: impl FnOnce(&mut DocumentMut)) -> Result<()> {
+    update_file(path, DEFAULT_CONFIG, f)
+}
+
+/// Edits a TOML file in place (keeping comments); `template` is used if it does not exist.
+pub(crate) fn update_file(
+    path: &Path,
+    template: &str,
+    f: impl FnOnce(&mut DocumentMut),
+) -> Result<()> {
     let raw = match fs::read_to_string(path) {
         Ok(raw) => raw,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => DEFAULT_CONFIG.into(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => template.into(),
         Err(e) => return Err(e).with_context(|| t!("io.read", path = path.display()).into_owned()),
     };
     let mut doc: DocumentMut = raw
@@ -308,18 +292,18 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("config.toml");
         set_value(&path, "theme", "nord").unwrap();
-        set_bool(&path, "show_done", false).unwrap();
+        set_bool(&path, "auto_sync", true).unwrap();
         set_value(&path, "theme", "gruvbox-dark").unwrap();
         let raw = fs::read_to_string(&path).unwrap();
         assert!(raw.starts_with("# shdo"), "header stays first:\n{raw}");
         assert!(raw.contains("# Theme, also set with `t` in the board\ntheme = \"gruvbox-dark\""));
         assert!(!raw.contains("# theme ="));
-        assert!(raw.contains("show_done = false"));
+        assert!(raw.contains("auto_sync = true"));
         // a key without a commented example still works
         set_value(&path, "custom", "x").unwrap();
         let cfg = AppConfig::load(&path).unwrap();
         assert_eq!(cfg.theme.as_deref(), Some("gruvbox-dark"));
-        assert_eq!(cfg.show_done, Some(false));
+        assert_eq!(cfg.auto_sync, Some(true));
         assert!(
             fs::read_to_string(&path)
                 .unwrap()
@@ -369,9 +353,9 @@ mod tests {
         let cfg = AppConfig::load(&path).unwrap();
         assert_eq!(cfg.theme.as_deref(), Some("gruvbox"));
         assert_eq!(cfg.data_dir(None), home().join("t"));
-        set_list(&path, "buckets", &["work".into(), "-".into()]).unwrap();
+        set_value(&path, "default_bucket", "work").unwrap();
         let cfg = AppConfig::load(&path).unwrap();
-        assert_eq!(cfg.buckets, ["work", "-"]);
+        assert_eq!(cfg.default_bucket.as_deref(), Some("work"));
         assert_eq!(cfg.theme.as_deref(), Some("gruvbox"));
     }
 }

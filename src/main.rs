@@ -6,6 +6,7 @@ mod git;
 mod holidays;
 mod i18n;
 mod quickadd;
+mod state;
 mod store;
 mod task;
 mod theme;
@@ -130,12 +131,17 @@ fn run() -> Result<()> {
     i18n::set(i18n::Lang::En);
     let cli = Cli::parse_from(rewrite_dashdash(std::env::args().collect()));
     let cfg_path = config::config_path();
+    // View state moved out of config.toml in 0.5; move leftovers once
+    if let Err(e) = state::migrate(&cfg_path, &state::path()) {
+        eprintln!("warning: {e:#}");
+    }
     let cfg = AppConfig::load(&cfg_path)?;
+    let view = state::ViewState::load(&state::path())?;
     let store = Store::new(cfg.data_dir(cli.dir.as_deref()));
     // The saved filter of this machine, as in the board
     let filter = Filter {
-        buckets: cfg.buckets.clone(),
-        tags: task::normalize_tags(cfg.tags.iter().map(String::as_str)),
+        buckets: view.buckets.clone(),
+        tags: task::normalize_tags(view.tags.iter().map(String::as_str)),
         done_days: cfg.done_days(),
         ..Filter::default()
     };

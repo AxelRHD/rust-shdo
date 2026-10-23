@@ -1198,3 +1198,6 @@ kb.tab:
 settings.edit_board:
   en: "Edit statuses & buckets (shdo.toml, shared)"
   de: "Spalten & Buckets bearbeiten (shdo.toml, geteilt)"
+help.files.state:
+  en: "view state"
+  de: "Ansichtszustand"

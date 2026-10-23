@@ -13,6 +13,7 @@ use crate::board::{self, Board, BucketOrigin, Filter, NO_BUCKET};
 use crate::config::{self, AppConfig};
 use crate::git::Git;
 use crate::holidays::Region;
+use crate::state;
 use crate::store::{StatusDef, Store};
 use crate::task::{PRIO_DEFAULT, Task};
 use crate::theme::{self, Theme};
@@ -165,6 +166,8 @@ pub struct App {
     pub store: Store,
     cfg: AppConfig,
     cfg_path: PathBuf,
+    /// Remembered view state (filters, toggles), separate from the settings.
+    state_path: PathBuf,
     pub board: Board,
     filter: Filter,
     pub col: usize,
@@ -200,6 +203,8 @@ pub struct App {
 
 impl App {
     pub fn new(store: Store, cfg: AppConfig, cfg_path: PathBuf) -> Result<App> {
+        let state_path = state::path();
+        let view = state::ViewState::load(&state_path).unwrap_or_default();
         let (themes, theme_warnings) = theme::load_all(&config::config_dir().join("themes"));
         let wanted = cfg.theme.as_deref().unwrap_or(theme::DEFAULT_THEME);
         let mut theme_warnings = theme_warnings;
@@ -214,13 +219,13 @@ impl App {
                     .unwrap_or(0)
             });
         let filter = Filter {
-            buckets: cfg.buckets.clone(),
-            tags: crate::task::normalize_tags(cfg.tags.iter().map(String::as_str)),
+            buckets: view.buckets.clone(),
+            tags: crate::task::normalize_tags(view.tags.iter().map(String::as_str)),
             done_days: cfg.done_days(),
             ..Filter::default()
         };
-        let show_done = cfg.show_done.unwrap_or(true);
-        let show_calendar = cfg.show_calendar.unwrap_or(true);
+        let show_done = view.show_done.unwrap_or(true);
+        let show_calendar = view.show_calendar.unwrap_or(true);
         let auto_sync = cfg.auto_sync.unwrap_or(false);
         let region = match Region::parse_setting(cfg.holidays.as_deref().unwrap_or("")) {
             Ok(r) => r,
@@ -236,6 +241,7 @@ impl App {
             store,
             cfg,
             cfg_path,
+            state_path,
             board,
             filter,
             col: 0,
@@ -469,7 +475,7 @@ impl App {
     fn toggle_show_done(&mut self) {
         self.show_done = !self.show_done;
         self.col = self.col.min(self.visible_columns() - 1);
-        let res = config::set_bool(&self.cfg_path, "show_done", self.show_done);
+        let res = state::set_bool(&self.state_path, "show_done", self.show_done);
         let name = self.board.columns[self.board.last_index()].def.name.clone();
         let msg = if self.show_done {
             t!("msg.column_shown", name = name).into_owned()
@@ -481,7 +487,7 @@ impl App {
 
     fn toggle_calendar(&mut self) {
         self.show_calendar = !self.show_calendar;
-        let res = config::set_bool(&self.cfg_path, "show_calendar", self.show_calendar);
+        let res = state::set_bool(&self.state_path, "show_calendar", self.show_calendar);
         let msg = if self.show_calendar {
             t!("msg.calendar_shown")
         } else {
@@ -1063,8 +1069,8 @@ impl App {
     fn save_filter(&mut self) {
         let buckets = self.board.filter.buckets.clone();
         let tags = self.filter.tags.clone();
-        let res = config::set_list(&self.cfg_path, "buckets", &buckets)
-            .and_then(|()| config::set_list(&self.cfg_path, "tags", &tags));
+        let res = state::set_list(&self.state_path, "buckets", &buckets)
+            .and_then(|()| state::set_list(&self.state_path, "tags", &tags));
         let label = [self.board.filter_label(), self.board.tag_label()]
             .into_iter()
             .flatten()
@@ -1557,7 +1563,7 @@ impl App {
             // Drop it from the saved filter, otherwise a dead entry remains
             if self.filter.buckets.iter().any(|b| b == bucket) {
                 self.filter.buckets.retain(|b| b != bucket);
-                config::set_list(&self.cfg_path, "buckets", &self.filter.buckets)?;
+                state::set_list(&self.state_path, "buckets", &self.filter.buckets)?;
             }
             Ok(what)
         })();
