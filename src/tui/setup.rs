@@ -1,4 +1,4 @@
-//! First-run setup: language, data directory and public holidays.
+//! First-run setup: language, data directory, public holidays and ntfy.
 
 use std::path::PathBuf;
 
@@ -27,7 +27,17 @@ enum Step {
     Buckets,
     Country,
     State,
+    /// Optional: push messages via ntfy (checkbox, server, topic).
+    Ntfy,
     Summary,
+}
+
+/// Focus on the ntfy step.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum NtfyField {
+    Enabled,
+    Server,
+    Topic,
 }
 
 struct Setup {
@@ -41,6 +51,10 @@ struct Setup {
     state: usize,
     /// 0 = home and work, 1 = none (only asked for a new board)
     buckets: usize,
+    ntfy: bool,
+    ntfy_field: NtfyField,
+    ntfy_server: Input,
+    ntfy_topic: Input,
     error: Option<String>,
 }
 
@@ -66,6 +80,7 @@ impl Setup {
             // No choice yet: German users most likely want German holidays
             None => (usize::from(lang == Lang::De), 0),
         };
+        let ntfy = cfg.ntfy.clone().unwrap_or_default();
         Setup {
             step: Step::Language,
             lang: Lang::ALL.iter().position(|l| *l == lang).unwrap_or(0),
@@ -74,6 +89,14 @@ impl Setup {
             country,
             state,
             buckets: 0,
+            ntfy: cfg.ntfy().is_some(),
+            ntfy_field: NtfyField::Enabled,
+            ntfy_server: Input::with(
+                ntfy.server
+                    .as_deref()
+                    .unwrap_or(crate::ntfy::DEFAULT_SERVER),
+            ),
+            ntfy_topic: Input::with(ntfy.topic.as_deref().unwrap_or("")),
             error: None,
         }
     }
@@ -100,6 +123,7 @@ impl Setup {
         if self.country == 1 {
             steps.push(Step::State);
         }
+        steps.push(Step::Ntfy);
         steps.push(Step::Summary);
         steps
     }
@@ -129,6 +153,7 @@ impl Setup {
             (Step::Language, KeyCode::Esc) => return Outcome::Abort,
             (Step::Summary, KeyCode::Enter) => return Outcome::Done,
             (Step::Dir, KeyCode::Enter) => self.confirm_dir(),
+            (Step::Ntfy, KeyCode::Enter) => self.confirm_ntfy(),
             (_, KeyCode::Enter) => self.go(1),
             (_, KeyCode::Esc) => self.go(-1),
             (Step::Language, code) => {
@@ -144,9 +169,71 @@ impl Setup {
             (Step::Buckets, code) => step_list(2, &mut self.buckets, code),
             (Step::Country, code) => step_list(2, &mut self.country, code),
             (Step::State, code) => step_list(GERMAN_STATES.len(), &mut self.state, code),
+            (Step::Ntfy, _) => self.ntfy_key(key),
             (Step::Summary, _) => {}
         }
         Outcome::Continue
+    }
+
+    fn ntfy_key(&mut self, key: KeyEvent) {
+        use NtfyField::*;
+        self.error = None;
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        let fields: &[NtfyField] = if self.ntfy {
+            &[Enabled, Server, Topic]
+        } else {
+            &[Enabled]
+        };
+        let i = fields
+            .iter()
+            .position(|f| *f == self.ntfy_field)
+            .unwrap_or(0);
+        match key.code {
+            KeyCode::Tab | KeyCode::Down => self.ntfy_field = fields[(i + 1) % fields.len()],
+            KeyCode::BackTab | KeyCode::Up => {
+                self.ntfy_field = fields[(i + fields.len() - 1) % fields.len()]
+            }
+            KeyCode::Char('g') if ctrl && self.ntfy => {
+                self.ntfy_topic = Input::with(&crate::ntfy::generate_topic());
+            }
+            KeyCode::Char(' ') if self.ntfy_field == Enabled => {
+                self.ntfy = !self.ntfy;
+                // Ready to use: a fresh random topic unless one is set already
+                if self.ntfy && self.ntfy_topic.text.trim().is_empty() {
+                    self.ntfy_topic = Input::with(&crate::ntfy::generate_topic());
+                }
+            }
+            _ => match self.ntfy_field {
+                Server => self.ntfy_server.handle(key),
+                Topic => self.ntfy_topic.handle(key),
+                Enabled => {}
+            },
+        }
+    }
+
+    /// Server and topic as they will be written; checks both.
+    fn ntfy_values(&self) -> Result<(String, String)> {
+        let server = crate::ntfy::normalize_server(&self.ntfy_server.text)?;
+        let topic = crate::ntfy::check_topic(&self.ntfy_topic.text)?.to_string();
+        Ok((server, topic))
+    }
+
+    fn confirm_ntfy(&mut self) {
+        if !self.ntfy {
+            return self.go(1);
+        }
+        match self.ntfy_values() {
+            Ok(_) => self.go(1),
+            Err(e) => {
+                self.ntfy_field = match self.ntfy_server.text.trim().is_empty()
+                    || crate::ntfy::normalize_server(&self.ntfy_server.text).is_err()
+                {
+                    true => NtfyField::Server,
+                    false => NtfyField::Topic,
+                };
+                self.error = Some(format!("{e:#}"));
+            }
+        }
     }
 
     fn confirm_dir(&mut self) {
@@ -166,6 +253,7 @@ impl Setup {
             language: self.lang(),
             dir: self.dir.text.trim().to_string(),
             holidays: self.holidays(),
+            ntfy: self.ntfy.then(|| self.ntfy_values().ok()).flatten(),
         }
     }
 }
@@ -248,6 +336,17 @@ fn draw(f: &mut ratatui::Frame, s: &Setup, c: &Palette, cfg_path: &std::path::Pa
         Step::Buckets | Step::Country | Step::State => {
             vec![("j/k", "kb.select"), ("⏎", "kb.next"), ("Esc", "kb.back")]
         }
+        Step::Ntfy => {
+            let mut k = vec![];
+            if s.ntfy_field == NtfyField::Enabled {
+                k.push(("Space", "kb.toggle"));
+            }
+            if s.ntfy {
+                k.extend([("Tab/↓", "kb.next_field"), ("^G", "kb.new_topic")]);
+            }
+            k.extend([("⏎", "kb.next"), ("Esc", "kb.back")]);
+            k
+        }
         Step::Summary => vec![("⏎", "kb.finish"), ("Esc", "kb.back")],
     };
     let hints = key_hints(&keys, c, area.width);
@@ -268,6 +367,7 @@ fn draw(f: &mut ratatui::Frame, s: &Setup, c: &Palette, cfg_path: &std::path::Pa
         Step::Buckets => ("setup.buckets.title", "setup.buckets.hint"),
         Step::Country => ("setup.country.title", "setup.country.hint"),
         Step::State => ("setup.state.title", "setup.state.hint"),
+        Step::Ntfy => ("setup.ntfy.title", "setup.ntfy.hint"),
         Step::Summary => ("setup.summary.title", "setup.summary.hint"),
     };
     let mut lines = vec![
@@ -349,6 +449,55 @@ fn draw(f: &mut ratatui::Frame, s: &Setup, c: &Palette, cfg_path: &std::path::Pa
                 lines.push(choice(i == s.state, name.to_string()));
             }
         }
+        Step::Ntfy => {
+            let focus = |f: NtfyField| s.ntfy_field == f;
+            let marker = |f: NtfyField| {
+                Span::styled(
+                    if focus(f) { "→ " } else { "  " },
+                    Style::new().fg(c.border_active),
+                )
+            };
+            let bold = |f: NtfyField| match focus(f) {
+                true => Style::new().add_modifier(Modifier::BOLD),
+                false => Style::new(),
+            };
+            lines.push(Line::from(vec![
+                marker(NtfyField::Enabled),
+                Span::styled(if s.ntfy { "[x] " } else { "[ ] " }, Style::new().fg(c.key)),
+                Span::styled(
+                    t!("setup.ntfy.enable").into_owned(),
+                    bold(NtfyField::Enabled),
+                ),
+            ]));
+            // The fields stay visible but greyed out until the box is ticked
+            for (field, label, input) in [
+                (NtfyField::Server, "setup.ntfy.server", &s.ntfy_server),
+                (NtfyField::Topic, "setup.ntfy.topic", &s.ntfy_topic),
+            ] {
+                let (visible, cx) = input_view(input, 40);
+                let label = format!("{:<9}", t!(label));
+                if s.ntfy && focus(field) {
+                    cursor = Some((lines.len(), 2 + label.chars().count() + 2 + cx));
+                }
+                let text_style = match s.ntfy {
+                    true => Style::new().fg(c.fg),
+                    false => Style::new().fg(c.dim),
+                };
+                lines.push(Line::from(vec![
+                    marker(field),
+                    Span::styled(label, bold(field).fg(c.dim)),
+                    Span::styled("▸ ", Style::new().fg(if s.ntfy { c.key } else { c.dim })),
+                    Span::styled(visible, text_style),
+                ]));
+            }
+            if s.ntfy {
+                lines.push(Line::default());
+                lines.push(Line::from(Span::styled(
+                    t!("setup.ntfy.topic_hint").into_owned(),
+                    Style::new().fg(c.dim),
+                )));
+            }
+        }
         Step::Summary => {
             let row = |k: &str, v: String| {
                 Line::from(vec![
@@ -371,6 +520,16 @@ fn draw(f: &mut ratatui::Frame, s: &Setup, c: &Palette, cfg_path: &std::path::Pa
             };
             lines.push(row("setup.summary.buckets", buckets));
             lines.push(row("setup.summary.holidays", holidays));
+            let ntfy = match s.result().ntfy {
+                Some((server, topic)) => {
+                    let server = server
+                        .split_once("://")
+                        .map_or(server.clone(), |(_, h)| h.into());
+                    format!("{server} · {topic}")
+                }
+                None => t!("setup.ntfy.off").into_owned(),
+            };
+            lines.push(row("setup.summary.ntfy", ntfy));
             lines.push(Line::default());
             lines.push(Line::from(Span::styled(
                 t!("setup.summary.later").into_owned(),
@@ -445,16 +604,53 @@ mod tests {
         assert_eq!(s.step, Step::State);
         s.handle(key(KeyCode::Down));
         s.handle(key(KeyCode::Enter));
+        // ntfy is optional and off by default
+        assert_eq!(s.step, Step::Ntfy);
+        assert!(!s.ntfy);
+        s.handle(key(KeyCode::Enter));
         assert_eq!(s.step, Step::Summary);
         assert_eq!(s.holidays().as_deref(), Some("de-by"));
+        assert_eq!(s.result().ntfy, None);
         assert!(matches!(s.handle(key(KeyCode::Enter)), Outcome::Done));
         // back to the country step and choose none: the state step disappears
         s.handle(key(KeyCode::Esc));
         s.handle(key(KeyCode::Esc));
+        s.handle(key(KeyCode::Esc));
         s.handle(key(KeyCode::Up));
+        s.handle(key(KeyCode::Enter));
+        assert_eq!(s.step, Step::Ntfy);
         s.handle(key(KeyCode::Enter));
         assert_eq!(s.step, Step::Summary);
         assert_eq!(s.holidays(), None);
+    }
+
+    #[test]
+    fn ntfy_step_offers_server_and_a_random_topic() {
+        let mut s = Setup::new(&cfg("en"), None);
+        s.step = Step::Ntfy;
+        // without the checkbox the fields cannot be reached
+        s.handle(key(KeyCode::Tab));
+        assert_eq!(s.ntfy_field, NtfyField::Enabled);
+        s.handle(key(KeyCode::Char(' ')));
+        assert!(s.ntfy);
+        assert_eq!(s.ntfy_server.text, "https://ntfy.sh");
+        let first = s.ntfy_topic.text.clone();
+        assert!(first.starts_with("shdo-"));
+        s.handle(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
+        assert_ne!(s.ntfy_topic.text, first);
+        // an invalid topic keeps the step and focuses the field
+        s.ntfy_topic = Input::with("mit leerzeichen");
+        s.handle(key(KeyCode::Enter));
+        assert_eq!(s.step, Step::Ntfy);
+        assert_eq!(s.ntfy_field, NtfyField::Topic);
+        assert!(s.error.is_some());
+        s.ntfy_topic = Input::with("shdo-test");
+        s.handle(key(KeyCode::Enter));
+        assert_eq!(s.step, Step::Summary);
+        assert_eq!(
+            s.result().ntfy,
+            Some(("https://ntfy.sh".into(), "shdo-test".into()))
+        );
     }
 
     #[test]

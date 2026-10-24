@@ -23,6 +23,9 @@ use crate::{dates, quickadd};
 pub enum InputKind {
     Rename,
     Due,
+    /// From the settings page; Enter and Esc return there.
+    NtfyServer,
+    NtfyTopic,
 }
 
 impl InputKind {
@@ -30,6 +33,17 @@ impl InputKind {
         match self {
             InputKind::Rename => t!("input.title").into_owned(),
             InputKind::Due => t!("input.due").into_owned(),
+            InputKind::NtfyServer => t!("settings.ntfy_server").into_owned(),
+            InputKind::NtfyTopic => t!("settings.ntfy_topic").into_owned(),
+        }
+    }
+
+    /// Settings row to return to after the input.
+    fn settings_row(self) -> Option<SettingsRow> {
+        match self {
+            InputKind::NtfyServer => Some(SettingsRow::NtfyServer),
+            InputKind::NtfyTopic => Some(SettingsRow::NtfyTopic),
+            InputKind::Rename | InputKind::Due => None,
         }
     }
 }
@@ -142,18 +156,22 @@ pub enum SettingsRow {
     DoneDays,
     AutoSync,
     Holidays,
+    NtfyServer,
+    NtfyTopic,
     Archive,
     /// shdo.toml: status and bucket names (shared via the repository)
     EditBoard,
     OpenFile,
 }
 
-pub const SETTINGS_ROWS: [SettingsRow; 8] = [
+pub const SETTINGS_ROWS: [SettingsRow; 10] = [
     SettingsRow::Language,
     SettingsRow::DefaultBucket,
     SettingsRow::DoneDays,
     SettingsRow::AutoSync,
     SettingsRow::Holidays,
+    SettingsRow::NtfyServer,
+    SettingsRow::NtfyTopic,
     SettingsRow::Archive,
     SettingsRow::EditBoard,
     SettingsRow::OpenFile,
@@ -404,6 +422,8 @@ impl App {
                     None => config::remove_key(&path, "holidays"),
                 }
             }
+            SettingsRow::NtfyServer => return self.open_settings_input(InputKind::NtfyServer),
+            SettingsRow::NtfyTopic => return self.open_settings_input(InputKind::NtfyTopic),
             SettingsRow::Archive | SettingsRow::EditBoard | SettingsRow::OpenFile => Ok(()),
         };
         match res {
@@ -464,7 +484,7 @@ impl App {
 
     /// `[ntfy]` is set in config.toml, so `p` can send tasks.
     pub fn can_push(&self) -> bool {
-        self.cfg.ntfy.is_some()
+        self.cfg.ntfy().is_some()
     }
 
     pub fn selected(&self) -> Option<&Task> {
@@ -633,11 +653,20 @@ impl App {
                 }
             },
             Mode::Input { kind, mut input } => match key.code {
-                KeyCode::Esc => {}
+                KeyCode::Esc => self.back_to_settings(kind),
                 KeyCode::Enter => {
-                    if !self.submit_input(kind, &input.text) {
+                    if self.submit_input(kind, &input.text) {
+                        self.back_to_settings(kind);
+                    } else {
                         self.mode = Mode::Input { kind, input };
                     }
+                }
+                KeyCode::Char('g')
+                    if kind == InputKind::NtfyTopic
+                        && key.modifiers.contains(KeyModifiers::CONTROL) =>
+                {
+                    let input = Input::with(&crate::ntfy::generate_topic());
+                    self.mode = Mode::Input { kind, input };
                 }
                 _ => {
                     input.handle(key);
@@ -918,8 +947,50 @@ impl App {
                 };
                 self.edit_selected(&msg, |t| t.set_due(due));
             }
+            InputKind::NtfyServer | InputKind::NtfyTopic => {
+                let path = self.cfg_path.clone();
+                let text = text.trim();
+                let (key, res) = match kind {
+                    InputKind::NtfyServer => ("server", crate::ntfy::normalize_server(text)),
+                    _ => ("topic", crate::ntfy::check_topic(text).map(str::to_string)),
+                };
+                // Empty removes the value: default server, or no sending
+                let res = match (text.is_empty(), res) {
+                    (true, _) => config::remove_in_table(&path, "ntfy", key),
+                    (false, Ok(v)) => config::set_in_table(&path, "ntfy", key, &v),
+                    (false, Err(e)) => Err(e),
+                };
+                if let Err(e) = res {
+                    self.set_status(Level::Error, format!("{e:#}"));
+                    return false;
+                }
+                self.reload_config();
+            }
         }
         true
+    }
+
+    /// After an input started from the settings page, show that page again.
+    fn back_to_settings(&mut self, kind: InputKind) {
+        if let Some(row) = kind.settings_row() {
+            let idx = SETTINGS_ROWS.iter().position(|r| *r == row).unwrap_or(0);
+            self.open_settings(idx);
+        }
+    }
+
+    /// Text input for a settings value, prefilled with the current one.
+    fn open_settings_input(&mut self, kind: InputKind) {
+        let ntfy = self.cfg.ntfy.clone().unwrap_or_default();
+        let text = match kind {
+            InputKind::NtfyServer => ntfy
+                .server
+                .unwrap_or_else(|| crate::ntfy::DEFAULT_SERVER.into()),
+            _ => ntfy.topic.unwrap_or_default(),
+        };
+        self.mode = Mode::Input {
+            kind,
+            input: Input::with(&text),
+        };
     }
 
     fn open_edit_form(&mut self) {
@@ -1047,7 +1118,7 @@ impl App {
 
     /// Sends the selected task via ntfy in the background, like the sync.
     fn start_push(&mut self) {
-        let Some(ntfy) = self.cfg.ntfy.clone() else {
+        let Some(ntfy) = self.cfg.ntfy().cloned() else {
             return self.set_status(Level::Info, t!("msg.push_not_set_up"));
         };
         if self.push_rx.is_some() {

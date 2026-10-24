@@ -383,6 +383,9 @@ kb.cancel:
 kb.clear:
   en: "clear"
   de: "leeren"
+kb.new_topic:
+  en: "new topic"
+  de: "neues Topic"
 kb.next_field:
   en: "next field"
   de: "nächstes Feld"
@@ -798,14 +801,17 @@ msg.push_sent:
   en: "sent via ntfy: %{title}"
   de: "über ntfy gesendet: %{title}"
 msg.push_not_set_up:
-  en: "ntfy is not set up – add [ntfy] with url = \"https://ntfy.sh/<topic>\" at the end of config.toml"
-  de: "ntfy ist nicht eingerichtet – [ntfy] mit url = \"https://ntfy.sh/<topic>\" ans Ende der config.toml"
+  en: "ntfy is not set up – set a topic on the settings page (,)"
+  de: "ntfy ist nicht eingerichtet – Topic in den Einstellungen (,) eintragen"
 ntfy.failed:
   en: "sending via ntfy failed"
   de: "Senden über ntfy fehlgeschlagen"
-ntfy.bad_url:
-  en: "invalid ntfy url \"%{url}\" – expected https://server/topic (letters, digits, - and _)"
-  de: "ungültige ntfy-URL „%{url}“ – erwartet https://server/topic (Buchstaben, Ziffern, - und _)"
+ntfy.bad_server:
+  en: "invalid ntfy server \"%{server}\""
+  de: "ungültiger ntfy-Server „%{server}“"
+ntfy.bad_topic:
+  en: "invalid ntfy topic \"%{topic}\" – letters, digits, - and _, at most 64"
+  de: "ungültiges ntfy-Topic „%{topic}“ – Buchstaben, Ziffern, - und _, höchstens 64"
 msg.sync_running:
   en: "sync running …"
   de: "Sync läuft …"
@@ -1018,6 +1024,30 @@ setup.state.title:
 setup.state.hint:
   en: "Public holidays differ between the states."
   de: "Die Feiertage unterscheiden sich je Bundesland."
+setup.ntfy.title:
+  en: "Push messages (optional)"
+  de: "Push-Nachrichten (optional)"
+setup.ntfy.hint:
+  en: "With ntfy, p sends a task to your phone, e.g. a shopping list. Install the ntfy app and subscribe to the topic."
+  de: "Mit ntfy schickt p eine Aufgabe aufs Handy, z. B. eine Einkaufsliste. Dazu die ntfy-App installieren und das Topic abonnieren."
+setup.ntfy.enable:
+  en: "Send tasks via ntfy"
+  de: "Aufgaben über ntfy senden"
+setup.ntfy.server:
+  en: "Server"
+  de: "Server"
+setup.ntfy.topic:
+  en: "Topic"
+  de: "Topic"
+setup.ntfy.topic_hint:
+  en: "Anyone who knows the topic can read along, so keep it long and random. Ctrl+G makes a new one."
+  de: "Wer das Topic kennt, kann mitlesen – also lang und zufällig lassen. Strg+G erzeugt ein neues."
+setup.ntfy.off:
+  en: "off"
+  de: "aus"
+setup.summary.ntfy:
+  en: "ntfy"
+  de: "ntfy"
 setup.summary.title:
   en: "All set"
   de: "Alles bereit"
@@ -1171,6 +1201,21 @@ settings.auto_sync:
 settings.holidays:
   en: "Holidays"
   de: "Feiertage"
+settings.ntfy_server:
+  en: "ntfy server"
+  de: "ntfy-Server"
+settings.ntfy_topic:
+  en: "ntfy topic"
+  de: "ntfy-Topic"
+settings.not_set_up:
+  en: "not set up"
+  de: "nicht eingerichtet"
+input.ntfy_server_hint:
+  en: "  (empty = ntfy.sh)"
+  de: "  (leer = ntfy.sh)"
+input.ntfy_topic_hint:
+  en: "  (long and random; empty = no sending)"
+  de: "  (lang und zufällig; leer = nicht senden)"
 settings.none:
   en: "none"
   de: "keine"

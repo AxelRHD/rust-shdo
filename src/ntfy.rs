@@ -10,11 +10,16 @@ use rust_i18n::t;
 
 use crate::task::Task;
 
-/// `[ntfy]` in config.toml.
-#[derive(Debug, Clone, serde::Deserialize)]
+/// Server used when `[ntfy]` has no `server`.
+pub const DEFAULT_SERVER: &str = "https://ntfy.sh";
+
+/// `[ntfy]` in config.toml; sending is enabled once a topic is set.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct NtfyConfig {
-    /// Server and topic, e.g. `https://ntfy.sh/my-secret-topic`.
-    pub url: String,
+    /// e.g. `https://ntfy.example.org`; default [`DEFAULT_SERVER`].
+    pub server: Option<String>,
+    /// Works like a password on ntfy.sh, so a long random one.
+    pub topic: Option<String>,
     /// Access token for protected topics (`tk_…`).
     pub token: Option<String>,
 }
@@ -32,33 +37,77 @@ pub struct Message {
     tags: Vec<String>,
 }
 
+/// Server without trailing slash; `https://` is added when missing.
+pub fn normalize_server(server: &str) -> Result<String> {
+    let s = server.trim().trim_end_matches('/');
+    if s.is_empty() || s.contains(char::is_whitespace) {
+        bail!(t!("ntfy.bad_server", server = server));
+    }
+    Ok(match s.contains("://") {
+        true => s.to_string(),
+        false => format!("https://{s}"),
+    })
+}
+
+/// A new random topic such as `shdo-k3Vq…` (24 random characters from /dev/urandom).
+/// On ntfy.sh the topic is the only protection, so it must not be guessable.
+pub fn generate_topic() -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let mut bytes = [0u8; 64];
+    let urandom = std::fs::File::open("/dev/urandom")
+        .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut bytes));
+    if urandom.is_err() {
+        bytes.fill_with(|| fastrand::u8(..));
+    }
+    // 248 = 4 * 62: dropping larger bytes keeps every character equally likely
+    let random: String = bytes
+        .iter()
+        .filter(|b| **b < 248)
+        .take(24)
+        .map(|b| CHARS[usize::from(*b) % CHARS.len()] as char)
+        .collect();
+    format!("shdo-{random}")
+}
+
+/// Topics are letters, digits, `-` and `_` (at most 64).
+pub fn check_topic(topic: &str) -> Result<&str> {
+    let t = topic.trim();
+    let ok = !t.is_empty()
+        && t.len() <= 64
+        && t.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    if !ok {
+        bail!(t!("ntfy.bad_topic", topic = topic));
+    }
+    Ok(t)
+}
+
 impl NtfyConfig {
-    /// `https://ntfy.sh/topic` → (`https://ntfy.sh`, `topic`).
-    fn split(&self) -> Result<(&str, &str)> {
-        let url = self.url.trim().trim_end_matches('/');
-        match url.rsplit_once('/') {
-            Some((base, topic))
-                if base.contains("://")
-                    && !topic.is_empty()
-                    && topic
-                        .chars()
-                        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') =>
-            {
-                Ok((base, topic))
-            }
-            _ => bail!(t!("ntfy.bad_url", url = self.url)),
-        }
+    /// The topic if one is set, i.e. sending is enabled.
+    pub fn topic(&self) -> Option<&str> {
+        self.topic
+            .as_deref()
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+    }
+
+    pub fn server(&self) -> Result<String> {
+        normalize_server(self.server.as_deref().unwrap_or(DEFAULT_SERVER))
     }
 
     pub fn send(&self, task: &Task) -> Result<()> {
-        let (base, topic) = self.split()?;
+        let Some(topic) = self.topic() else {
+            bail!(t!("msg.push_not_set_up"));
+        };
+        let topic = check_topic(topic)?;
+        let base = self.server()?;
         let msg = message(task, topic);
         let agent: ureq::Agent = ureq::Agent::config_builder()
             .timeout_global(Some(Duration::from_secs(15)))
             .http_status_as_error(false)
             .build()
             .into();
-        let mut req = agent.post(base);
+        let mut req = agent.post(&base);
         if let Some(token) = self.token.as_deref().filter(|t| !t.is_empty()) {
             req = req.header("Authorization", &format!("Bearer {token}"));
         }
@@ -149,20 +198,33 @@ mod tests {
     }
 
     #[test]
-    fn url_is_split_into_server_and_topic() {
-        let cfg = |url: &str| NtfyConfig {
-            url: url.into(),
-            token: None,
-        };
-        let c = cfg("https://ntfy.sh/shdo-abc_1/");
-        assert_eq!(c.split().unwrap(), ("https://ntfy.sh", "shdo-abc_1"));
-        let c = cfg("https://push.example.org/ntfy/einkauf");
+    fn generated_topics_are_valid_and_differ() {
+        let a = generate_topic();
+        assert!(a.starts_with("shdo-"));
+        assert_eq!(a.len(), 5 + 24);
+        assert_eq!(check_topic(&a).unwrap(), a);
+        assert_ne!(a, generate_topic());
+    }
+
+    #[test]
+    fn server_and_topic_are_checked() {
+        assert_eq!(NtfyConfig::default().server().unwrap(), DEFAULT_SERVER);
         assert_eq!(
-            c.split().unwrap(),
-            ("https://push.example.org/ntfy", "einkauf")
+            normalize_server("push.example.org/ntfy/").unwrap(),
+            "https://push.example.org/ntfy"
         );
-        assert!(cfg("https://ntfy.sh/").split().is_err());
-        assert!(cfg("ntfy.sh/topic").split().is_err());
-        assert!(cfg("https://ntfy.sh/a b").split().is_err());
+        assert_eq!(
+            normalize_server("http://localhost:8080").unwrap(),
+            "http://localhost:8080"
+        );
+        assert!(normalize_server(" ").is_err());
+        assert_eq!(check_topic(" shdo-abc_1 ").unwrap(), "shdo-abc_1");
+        assert!(check_topic("a b").is_err());
+        assert!(check_topic(&"x".repeat(65)).is_err());
+        let cfg = NtfyConfig {
+            topic: Some("  ".into()),
+            ..NtfyConfig::default()
+        };
+        assert_eq!(cfg.topic(), None);
     }
 }

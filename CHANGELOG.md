@@ -4,7 +4,10 @@
 
 - Send a task via ntfy with `p` (board and details) or `shdo push <id>`: title, notes
   and priority as a push message, checklists as ☐ / ☑ – e.g. a shopping list to the
-  phone. Set up with `[ntfy]` and `url` (optionally `token`) in config.toml
+  phone. Server and topic are set on the settings page (`[ntfy]` with `server`, `topic`
+  and optionally `token` in config.toml); `p` only appears once a topic is set
+- The setup has an optional ntfy step: a checkbox turns it on and fills in ntfy.sh and
+  a random `shdo-…` topic; `Ctrl+G` makes a new topic there and on the settings page
 
 ## 0.6.0 - 2026-10-24
 

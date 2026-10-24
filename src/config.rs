@@ -39,8 +39,10 @@ pub const DEFAULT_CONFIG: &str = r#"# shdo – settings for this machine (not sy
 
 # Send a task as a push message with `p` / `shdo push` (https://ntfy.sh); the topic
 # works like a password, so pick a random one. Must stay at the end of the file.
+# Server and topic can also be set on the settings page (,).
 # [ntfy]
-# url = "https://ntfy.sh/shdo-<random>"
+# server = "https://ntfy.sh"
+# topic = "shdo-<random>"
 # token = "tk_..."   # only for protected topics
 
 # What the board remembers by itself (filters, shown columns, calendar) is not kept
@@ -105,6 +107,11 @@ pub fn expand_tilde(p: &str) -> PathBuf {
 pub const DONE_DAYS_DEFAULT: u32 = 14;
 
 impl AppConfig {
+    /// `[ntfy]` with a topic, i.e. `p` / `shdo push` can send.
+    pub fn ntfy(&self) -> Option<&crate::ntfy::NtfyConfig> {
+        self.ntfy.as_ref().filter(|n| n.topic().is_some())
+    }
+
     /// Days of done tasks to show; `None` = all (`done_days = 0`).
     pub fn done_days(&self) -> Option<u32> {
         match self.done_days.unwrap_or(DONE_DAYS_DEFAULT) {
@@ -181,6 +188,23 @@ pub fn set_bool(path: &Path, key: &str, val: bool) -> Result<()> {
     update(path, |doc| doc[key] = value(val))
 }
 
+/// Sets `key` in `[table]`; the table is created at the end of the file if needed.
+pub fn set_in_table(path: &Path, table: &str, key: &str, val: &str) -> Result<()> {
+    update(path, |doc| doc[table][key] = value(val))
+}
+
+/// Removes `key` from `[table]`, and the table once it is empty.
+pub fn remove_in_table(path: &Path, table: &str, key: &str) -> Result<()> {
+    update(path, |doc| {
+        if let Some(t) = doc.get_mut(table).and_then(|t| t.as_table_like_mut()) {
+            t.remove(key);
+            if t.is_empty() {
+                doc.remove(table);
+            }
+        }
+    })
+}
+
 /// Result of the setup dialog.
 pub struct Setup {
     pub language: Lang,
@@ -188,6 +212,8 @@ pub struct Setup {
     pub dir: String,
     /// `holidays` value such as `de-bw`; `None` = no holidays.
     pub holidays: Option<String>,
+    /// ntfy (server, topic); `None` = sending switched off.
+    pub ntfy: Option<(String, String)>,
 }
 
 /// Writes the setup choices; other settings and comments in an existing file stay.
@@ -199,6 +225,22 @@ pub fn write_setup(path: &Path, setup: &Setup) -> Result<()> {
             Some(h) => doc["holidays"] = value(h.as_str()),
             None => {
                 doc.remove("holidays");
+            }
+        }
+        match &setup.ntfy {
+            Some((server, topic)) => {
+                doc["ntfy"]["server"] = value(server.as_str());
+                doc["ntfy"]["topic"] = value(topic.as_str());
+            }
+            // Without a topic nothing is sent; a token stays for later
+            None => {
+                if let Some(t) = doc.get_mut("ntfy").and_then(|t| t.as_table_like_mut()) {
+                    t.remove("server");
+                    t.remove("topic");
+                    if t.is_empty() {
+                        doc.remove("ntfy");
+                    }
+                }
             }
         }
     })
@@ -326,7 +368,12 @@ mod tests {
             language: Lang::De,
             dir: "~/notes/tasks".into(),
             holidays: Some("de-by".into()),
+            ntfy: Some(("https://ntfy.sh".into(), "shdo-abc".into())),
         };
+        write_setup(&path, &setup).unwrap();
+        let cfg = AppConfig::load(&path).unwrap();
+        assert_eq!(cfg.ntfy().unwrap().topic(), Some("shdo-abc"));
+        setup.ntfy = None;
         write_setup(&path, &setup).unwrap();
         let cfg = AppConfig::load(&path).unwrap();
         assert_eq!(cfg.lang(), Lang::De);
@@ -341,6 +388,23 @@ mod tests {
                 .contains("# Data directory")
         );
         assert_eq!(contract_tilde(&home().join("a/b")), "~/a/b");
+    }
+
+    #[test]
+    fn table_values_go_below_the_top_level_keys() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("config.toml");
+        set_value(&path, "theme", "nord").unwrap();
+        set_in_table(&path, "ntfy", "topic", "shdo-abc").unwrap();
+        set_value(&path, "language", "de").unwrap();
+        let cfg = AppConfig::load(&path).unwrap();
+        assert_eq!(cfg.ntfy().unwrap().topic(), Some("shdo-abc"));
+        assert_eq!(cfg.lang(), Lang::De);
+        assert_eq!(cfg.theme.as_deref(), Some("nord"));
+        remove_in_table(&path, "ntfy", "topic").unwrap();
+        let cfg = AppConfig::load(&path).unwrap();
+        assert!(cfg.ntfy.is_none());
+        assert!(!fs::read_to_string(&path).unwrap().contains("\n[ntfy]"));
     }
 
     #[test]

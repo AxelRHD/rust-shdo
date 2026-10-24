@@ -261,8 +261,9 @@ fn run() -> Result<()> {
             Ok(())
         }
         Cmd::Push { id } => {
-            let ntfy = cfg.ntfy.as_ref().context(
-                "ntfy is not set up – add [ntfy] with url = \"https://ntfy.sh/<topic>\" to config.toml",
+            let ntfy = cfg.ntfy().context(
+                "ntfy is not set up – set a topic on the settings page (,) \
+                 or add [ntfy] with topic = \"...\" to config.toml",
             )?;
             let task = store.find(&id)?;
             ntfy.send(&task)?;

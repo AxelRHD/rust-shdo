@@ -518,6 +518,8 @@ fn draw_status(f: &mut Frame, app: &App, c: &Palette, area: Rect) {
         let label = format!(" {}: ", kind.label());
         let hint = match kind {
             super::app::InputKind::Due => t!("input.due_hint"),
+            super::app::InputKind::NtfyServer => t!("input.ntfy_server_hint"),
+            super::app::InputKind::NtfyTopic => t!("input.ntfy_topic_hint"),
             super::app::InputKind::Rename => "".into(),
         };
         let line = Line::from(vec![
@@ -601,6 +603,15 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
             ]);
             k
         }
+        Mode::Input {
+            kind: super::app::InputKind::NtfyTopic,
+            ..
+        } => vec![
+            ("⏎", "kb.save"),
+            ("Esc", "kb.cancel"),
+            ("^U", "kb.clear"),
+            ("^G", "kb.new_topic"),
+        ],
         Mode::Input { .. } => vec![("⏎", "kb.save"), ("Esc", "kb.cancel"), ("^U", "kb.clear")],
         Mode::Search { .. } => vec![("⏎", "kb.apply"), ("Esc", "kb.clear_search")],
         Mode::Form(form) => {
@@ -1560,6 +1571,23 @@ fn setting_value(app: &App, row: SettingsRow) -> Option<String> {
             }
             None => t!("settings.none").into_owned(),
         },
+        SettingsRow::NtfyServer => {
+            let ntfy = cfg.ntfy.clone().unwrap_or_default();
+            let server = ntfy
+                .server()
+                .unwrap_or_else(|_| ntfy.server.unwrap_or_default());
+            server
+                .split_once("://")
+                .map_or(server.clone(), |(_, s)| s.to_string())
+        }
+        // The topic works like a password: only its start is shown
+        SettingsRow::NtfyTopic => match cfg.ntfy().and_then(|n| n.topic()) {
+            Some(topic) => match topic.char_indices().nth(6) {
+                Some((i, _)) => format!("{}…", &topic[..i]),
+                None => topic.to_string(),
+            },
+            None => t!("settings.not_set_up").into_owned(),
+        },
         SettingsRow::Archive | SettingsRow::EditBoard | SettingsRow::OpenFile => return None,
     })
 }
@@ -1595,6 +1623,8 @@ fn draw_settings(
                     SettingsRow::DefaultBucket => t!("settings.default_bucket"),
                     SettingsRow::DoneDays => t!("settings.done_days"),
                     SettingsRow::AutoSync => t!("settings.auto_sync"),
+                    SettingsRow::NtfyServer => t!("settings.ntfy_server"),
+                    SettingsRow::NtfyTopic => t!("settings.ntfy_topic"),
                     _ => t!("settings.holidays"),
                 };
                 let arrow = Style::new().fg(if sel { c.border_active } else { c.dim });

@@ -82,7 +82,8 @@ Run `shdo`. On the first start a short setup asks for
 2. the data directory (default `~/.local/share/shdo`; an existing shdo directory is
    picked up as is),
 3. whether to start with the buckets *home* and *work*,
-4. optionally public holidays for the calendar.
+4. optionally public holidays for the calendar,
+5. optionally [ntfy](https://ntfy.sh) for push messages, with a random topic ready to use.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/AxelRHD/rust-shdo/main/docs/setup.gif" alt="shdo setup on the first start: language, data directory, buckets and holidays" width="900">
@@ -119,7 +120,7 @@ them.
 | `v` / `c` | show or hide the done column / the calendar |
 | `s` | sync with the git remote |
 | `t` | choose a theme |
-| `,` | settings: language, default bucket, how long done tasks stay, auto-sync, holidays, archiving |
+| `,` | settings: language, default bucket, how long done tasks stay, auto-sync, holidays, ntfy, archiving |
 | `q` | quit |
 
 ## Command line
@@ -202,13 +203,15 @@ error, and pressing `q` again quits without syncing.
 
 `p` on the board (or `shdo push <id>`) sends the selected task as a push message via
 [ntfy](https://ntfy.sh): the title, the notes and the priority, with checklists shown
-as ☐ / ☑. Add this at the **end** of `config.toml` and subscribe to the topic in the
-ntfy app:
+as ☐ / ☑. Set it up in `shdo setup` or on the settings page (`,`), where `Ctrl+G` makes
+a random topic, and subscribe to that topic in the ntfy app;
+`p` appears once a topic is set. In `config.toml` this is a table at the end of the file:
 
 ```toml
 [ntfy]
-url = "https://ntfy.sh/shdo-<random>"  # or your own server
-token = "tk_..."                       # optional, for protected topics
+server = "https://ntfy.sh"  # default; or your own server
+topic = "shdo-<random>"
+token = "tk_..."            # optional, for protected topics (only in the file)
 ```
 
 On ntfy.sh anyone who knows the topic can read and send messages, so pick a long
