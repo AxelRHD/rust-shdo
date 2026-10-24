@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0 - 2026-10-24
 
 - Send a task via ntfy with `p` (board and details) or `shdo push <id>`: title, notes
   and priority as a push message, checklists as ☐ / ☑ – e.g. a shopping list to the
