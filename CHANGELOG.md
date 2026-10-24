@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 - 2026-10-24
 
 - The form suggests known tags while you type one (`+rep` → `+reporting`, also in the
   tags field) and buckets after `@` in the title; `→` takes the grey suggestion over.
