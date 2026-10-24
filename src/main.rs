@@ -5,6 +5,7 @@ mod dates;
 mod git;
 mod holidays;
 mod i18n;
+mod ntfy;
 mod quickadd;
 mod state;
 mod store;
@@ -77,6 +78,8 @@ enum Cmd {
     Rm { id: String },
     /// Open the task file in the editor
     Edit { id: String },
+    /// Send a task via ntfy, e.g. a shopping list to the phone (`[ntfy]` in the config)
+    Push { id: String },
     /// Sync with the git remote
     Sync,
     /// Move done tasks older than `done_days` (default 14) to archive/
@@ -110,6 +113,7 @@ const SUBCOMMANDS: &[&str] = &[
     "mv",
     "rm",
     "edit",
+    "push",
     "sync",
     "archive",
     "init",
@@ -254,6 +258,15 @@ fn run() -> Result<()> {
             if let Err(e) = task::Task::load(&task.path) {
                 eprintln!("warning: {} is now invalid: {e:#}", task.path.display());
             }
+            Ok(())
+        }
+        Cmd::Push { id } => {
+            let ntfy = cfg.ntfy.as_ref().context(
+                "ntfy is not set up – add [ntfy] with url = \"https://ntfy.sh/<topic>\" to config.toml",
+            )?;
+            let task = store.find(&id)?;
+            ntfy.send(&task)?;
+            println!("sent  {}  {}", task.id, task.title);
             Ok(())
         }
         Cmd::Sync => {

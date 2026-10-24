@@ -71,7 +71,7 @@ function __shdo_complete --description 'shdo __complete using the --dir from the
     shdo $dir __complete $argv 2>/dev/null
 end
 
-complete -c shdo -n '__shdo_arg 1 done rm edit mv bucket tag' -f -a '(__shdo_complete ids)'
+complete -c shdo -n '__shdo_arg 1 done rm edit push mv bucket tag' -f -a '(__shdo_complete ids)'
 complete -c shdo -n '__shdo_arg 2 mv' -f -a '(__shdo_complete statuses)'
 complete -c shdo -n '__shdo_arg 2 bucket' -f -a '(__shdo_complete buckets)'
 complete -c shdo -n '__shdo_arg 1 ls' -f -a '(__shdo_complete at-buckets)'

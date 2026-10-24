@@ -189,6 +189,8 @@ pub struct App {
     pub theme_warnings: Vec<String>,
     fingerprint: u64,
     sync_rx: Option<Receiver<Result<String>>>,
+    /// Running ntfy push: title of the task and the result.
+    push_rx: Option<(String, Receiver<Result<()>>)>,
     pub quit: bool,
     /// Sync once on start and once on quit (config `auto_sync`).
     auto_sync: bool,
@@ -260,6 +262,7 @@ impl App {
             theme,
             theme_warnings,
             sync_rx: None,
+            push_rx: None,
             quit: false,
             editor_request: None,
             config_request: false,
@@ -434,6 +437,7 @@ impl App {
                 fresh.rows = std::mem::take(&mut self.rows);
                 fresh.filter.query = std::mem::take(&mut self.filter.query);
                 fresh.sync_rx = self.sync_rx.take();
+                fresh.push_rx = self.push_rx.take();
                 *self = fresh;
                 self.reload(keep);
                 let mut msg = t!("msg.settings_applied").into_owned();
@@ -456,6 +460,11 @@ impl App {
 
     pub fn syncing(&self) -> bool {
         self.sync_rx.is_some()
+    }
+
+    /// `[ntfy]` is set in config.toml, so `p` can send tasks.
+    pub fn can_push(&self) -> bool {
+        self.cfg.ntfy.is_some()
     }
 
     pub fn selected(&self) -> Option<&Task> {
@@ -570,6 +579,13 @@ impl App {
                 }
             }
         }
+        if let Some((title, rx)) = &self.push_rx
+            && let Ok(res) = rx.try_recv()
+        {
+            let msg = t!("msg.push_sent", title = title).into_owned();
+            self.push_rx = None;
+            self.report(res, msg);
+        }
         if matches!(
             self.mode,
             Mode::Normal | Mode::Help { .. } | Mode::Themes { .. }
@@ -670,6 +686,7 @@ impl App {
                 }
                 KeyCode::Char('e') => self.open_edit_form(),
                 KeyCode::Char('E') => self.request_editor(),
+                KeyCode::Char('p') => self.start_push(),
                 _ => {}
             },
             Mode::Filter {
@@ -789,6 +806,7 @@ impl App {
             KeyCode::Char('c') => self.toggle_calendar(),
             KeyCode::Char('b') => self.open_pick_bucket(),
             KeyCode::Char('s') => self.start_sync(),
+            KeyCode::Char('p') => self.start_push(),
             KeyCode::Char('R') => {
                 let keep = self.selected_id();
                 self.reload(keep);
@@ -1025,6 +1043,26 @@ impl App {
         });
         self.sync_rx = Some(rx);
         self.set_status(Level::Info, t!("msg.sync_running"));
+    }
+
+    /// Sends the selected task via ntfy in the background, like the sync.
+    fn start_push(&mut self) {
+        let Some(ntfy) = self.cfg.ntfy.clone() else {
+            return self.set_status(Level::Info, t!("msg.push_not_set_up"));
+        };
+        if self.push_rx.is_some() {
+            return;
+        }
+        let Some(task) = self.selected().cloned() else {
+            return;
+        };
+        let (tx, rx) = mpsc::channel();
+        let title = task.title.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(ntfy.send(&task));
+        });
+        self.push_rx = Some((title, rx));
+        self.set_status(Level::Info, t!("msg.push_running"));
     }
 
     fn no_buckets(&mut self) -> bool {

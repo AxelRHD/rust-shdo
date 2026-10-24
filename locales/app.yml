@@ -341,6 +341,9 @@ kb.editor:
 kb.done:
   en: "done"
   de: "erledigt"
+kb.push:
+  en: "send"
+  de: "senden"
 kb.details:
   en: "details"
   de: "Details"
@@ -500,6 +503,9 @@ help.cards.due:
 help.cards.bucket:
   en: "set bucket"
   de: "Bucket setzen"
+help.cards.push:
+  en: "send via ntfy, e.g. a shopping list to the phone"
+  de: "über ntfy senden, z. B. eine Einkaufsliste aufs Handy"
 help.cards.delete:
   en: "delete"
   de: "löschen"
@@ -785,6 +791,21 @@ msg.from_filter:
 msg.hidden_by_filter:
   en: "hidden by the filter"
   de: "durch den Filter ausgeblendet"
+msg.push_running:
+  en: "sending via ntfy …"
+  de: "Sende über ntfy …"
+msg.push_sent:
+  en: "sent via ntfy: %{title}"
+  de: "über ntfy gesendet: %{title}"
+msg.push_not_set_up:
+  en: "ntfy is not set up – add [ntfy] with url = \"https://ntfy.sh/<topic>\" at the end of config.toml"
+  de: "ntfy ist nicht eingerichtet – [ntfy] mit url = \"https://ntfy.sh/<topic>\" ans Ende der config.toml"
+ntfy.failed:
+  en: "sending via ntfy failed"
+  de: "Senden über ntfy fehlgeschlagen"
+ntfy.bad_url:
+  en: "invalid ntfy url \"%{url}\" – expected https://server/topic (letters, digits, - and _)"
+  de: "ungültige ntfy-URL „%{url}“ – erwartet https://server/topic (Buchstaben, Ziffern, - und _)"
 msg.sync_running:
   en: "sync running …"
   de: "Sync läuft …"

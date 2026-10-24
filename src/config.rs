@@ -37,6 +37,12 @@ pub const DEFAULT_CONFIG: &str = r#"# shdo – settings for this machine (not sy
 # (states: bw, by, be, bb, hb, hh, he, mv, ni, nw, rp, sl, sn, st, sh, th)
 # holidays = "de-bw"
 
+# Send a task as a push message with `p` / `shdo push` (https://ntfy.sh); the topic
+# works like a password, so pick a random one. Must stay at the end of the file.
+# [ntfy]
+# url = "https://ntfy.sh/shdo-<random>"
+# token = "tk_..."   # only for protected topics
+
 # What the board remembers by itself (filters, shown columns, calendar) is not kept
 # here but in ~/.local/state/shdo/state.toml.
 "#;
@@ -51,6 +57,7 @@ pub struct AppConfig {
     pub default_bucket: Option<String>,
     pub done_days: Option<u32>,
     pub holidays: Option<String>,
+    pub ntfy: Option<crate::ntfy::NtfyConfig>,
 }
 
 /// `$SHDO_CONFIG_DIR`, else `$XDG_CONFIG_HOME/shdo`, else `~/.config/shdo`.

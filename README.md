@@ -43,6 +43,7 @@ just files you can read, edit and diff.
 - Settings page (`,`) for language, default bucket, auto-sync, holidays and how long
   done tasks stay on the board (14 days by default; `shdo archive` moves older ones away)
 - Markdown notes with checklists (`☐ 1/3` on the card)
+- Send a task to your phone via [ntfy](https://ntfy.sh) – handy for a shopping list
 - 18 built-in themes – Tokyo Night (also Day), Nord, Gruvbox Dark/Light, Catppuccin
   Mocha/Latte, Dracula, One Dark, Kanagawa, Everforest Dark/Light, Rosé Pine (also Moon
   and Dawn), Solarized Dark/Light, Terminal – plus your own
@@ -111,6 +112,7 @@ them.
 | `x` | mark as done / reopen |
 | `1` `2` `3` | priority high / normal / low |
 | `D`, `r`, `b`, `d` | due date, rename, bucket, delete |
+| `p` | send the card via ntfy (when set up) |
 | `⏎` | details with notes |
 | `/` | search titles, notes and IDs (live; `Esc` clears) |
 | `f` | filter by buckets and tags (`←`/`→` switches the tab); create, rename and delete buckets |
@@ -134,6 +136,7 @@ shdo bucket a3f home                # set a bucket, "-" removes it
 shdo tag a3f dev ops                # set tags, "-" removes them
 shdo ls @work +dev                  # show only these, once
 shdo edit a3f                       # open the file in $EDITOR
+shdo push a3f                       # send the task via ntfy
 shdo sync                           # git add, commit, pull --rebase, push
 shdo archive                        # archive done tasks older than done_days (--all: all)
 ```
@@ -194,6 +197,22 @@ With `auto_sync = true` the board syncs once in the background when it opens and
 when you quit – only if there is something to send. It never syncs on every change;
 press `s` to sync in between. If the sync on quit fails, the board stays open with the
 error, and pressing `q` again quits without syncing.
+
+### Push messages with ntfy
+
+`p` on the board (or `shdo push <id>`) sends the selected task as a push message via
+[ntfy](https://ntfy.sh): the title, the notes and the priority, with checklists shown
+as ☐ / ☑. Add this at the **end** of `config.toml` and subscribe to the topic in the
+ntfy app:
+
+```toml
+[ntfy]
+url = "https://ntfy.sh/shdo-<random>"  # or your own server
+token = "tk_..."                       # optional, for protected topics
+```
+
+On ntfy.sh anyone who knows the topic can read and send messages, so pick a long
+random one. Tags that match an emoji name (e.g. `+shopping_cart`) appear as emoji.
 
 ### Themes
 

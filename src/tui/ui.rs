@@ -45,6 +45,7 @@ const HELP: &[(&str, &[(&str, &str)])] = &[
             ("1 2 3", "help.cards.prio"),
             ("D", "help.cards.due"),
             ("b", "help.cards.bucket"),
+            ("p", "help.cards.push"),
             ("d", "help.cards.delete"),
         ],
     ),
@@ -585,6 +586,9 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
             if has_buckets {
                 k.push(("b", "kb.bucket"));
             }
+            if app.can_push() {
+                k.push(("p", "kb.push"));
+            }
             k.push(("v", "kb.toggle_done"));
             k.push(("c", "kb.calendar"));
             k.push(("/", "kb.search"));
@@ -616,12 +620,14 @@ fn keybar_lines(app: &App, c: &Palette, width: u16) -> Vec<Line<'static>> {
             ("⏎", "kb.apply"),
             ("Esc", "kb.cancel"),
         ],
-        Mode::Detail { .. } => vec![
-            ("j/k", "kb.scroll"),
-            ("e", "kb.edit"),
-            ("E", "kb.editor"),
-            ("Esc", "kb.close"),
-        ],
+        Mode::Detail { .. } => {
+            let mut k = vec![("j/k", "kb.scroll"), ("e", "kb.edit"), ("E", "kb.editor")];
+            if app.can_push() {
+                k.push(("p", "kb.push"));
+            }
+            k.push(("Esc", "kb.close"));
+            k
+        }
         Mode::Filter { .. } => vec![
             ("←/→", "kb.tab"),
             ("j/k", "kb.select"),
