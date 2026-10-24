@@ -1,0 +1,21 @@
+# Kanagawa (Wave) – https://github.com/rebelot/kanagawa.nvim
+name = "Kanagawa"
+
+[colors]
+bg = "#1f1f28"            # sumiInk1
+fg = "#dcd7ba"            # fujiWhite
+dim = "#727169"           # fujiGray
+border = "#54546d"        # sumiInk4
+border_active = "#98bb6c" # springGreen
+title = "#7e9cd8"         # crystalBlue
+accent = "#7fb4ca"        # springBlue
+selection = "#2d4f67"     # waveBlue2
+prio_high = "#e46876"     # waveRed
+prio_low = "#727169"
+overdue = "#ff5d62"       # peachRed
+today = "#e6c384"         # carpYellow
+done = "#98bb6c"
+key = "#957fb8"           # oniViolet
+warn = "#ffa066"          # surimiOrange
+weekend = "#938aa9"       # springViolet1
+holiday = "#ffa066"

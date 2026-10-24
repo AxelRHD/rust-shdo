@@ -43,8 +43,9 @@ just files you can read, edit and diff.
 - Settings page (`,`) for language, default bucket, auto-sync, holidays and how long
   done tasks stay on the board (14 days by default; `shdo archive` moves older ones away)
 - Markdown notes with checklists (`☐ 1/3` on the card)
-- 7 built-in themes – Tokyo Night, Nord, Gruvbox Dark/Light, Catppuccin Mocha/Latte,
-  Terminal – plus your own
+- 18 built-in themes – Tokyo Night (also Day), Nord, Gruvbox Dark/Light, Catppuccin
+  Mocha/Latte, Dracula, One Dark, Kanagawa, Everforest Dark/Light, Rosé Pine (also Moon
+  and Dawn), Solarized Dark/Light, Terminal – plus your own
 - English and German interface
 - Shell completion, with task IDs, statuses and buckets for fish
 

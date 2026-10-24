@@ -1,0 +1,21 @@
+# Everforest Dark (medium) – https://github.com/sainnhe/everforest
+name = "Everforest Dark"
+
+[colors]
+bg = "#2d353b"            # bg0
+fg = "#d3c6aa"
+dim = "#7a8478"           # grey0
+border = "#475258"        # bg3
+border_active = "#a7c080" # green
+title = "#7fbbb3"         # blue
+accent = "#83c092"        # aqua
+selection = "#3d484d"     # bg2
+prio_high = "#e67e80"     # red
+prio_low = "#7a8478"
+overdue = "#e67e80"
+today = "#dbbc7f"         # yellow
+done = "#a7c080"
+key = "#d699b6"           # purple
+warn = "#e69875"          # orange
+weekend = "#9da9a0"       # grey2
+holiday = "#e69875"

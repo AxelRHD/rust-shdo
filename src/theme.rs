@@ -19,6 +19,26 @@ const BUILTIN: &[(&str, &str)] = &[
         "catppuccin-mocha",
         include_str!("../themes/catppuccin-mocha.toml"),
     ),
+    ("dracula", include_str!("../themes/dracula.toml")),
+    ("one-dark", include_str!("../themes/one-dark.toml")),
+    ("kanagawa", include_str!("../themes/kanagawa.toml")),
+    (
+        "everforest-dark",
+        include_str!("../themes/everforest-dark.toml"),
+    ),
+    ("rose-pine", include_str!("../themes/rose-pine.toml")),
+    (
+        "rose-pine-moon",
+        include_str!("../themes/rose-pine-moon.toml"),
+    ),
+    (
+        "solarized-dark",
+        include_str!("../themes/solarized-dark.toml"),
+    ),
+    (
+        "tokyonight-day",
+        include_str!("../themes/tokyonight-day.toml"),
+    ),
     (
         "gruvbox-light",
         include_str!("../themes/gruvbox-light.toml"),
@@ -26,6 +46,18 @@ const BUILTIN: &[(&str, &str)] = &[
     (
         "catppuccin-latte",
         include_str!("../themes/catppuccin-latte.toml"),
+    ),
+    (
+        "everforest-light",
+        include_str!("../themes/everforest-light.toml"),
+    ),
+    (
+        "rose-pine-dawn",
+        include_str!("../themes/rose-pine-dawn.toml"),
+    ),
+    (
+        "solarized-light",
+        include_str!("../themes/solarized-light.toml"),
     ),
     ("terminal", include_str!("../themes/terminal.toml")),
 ];

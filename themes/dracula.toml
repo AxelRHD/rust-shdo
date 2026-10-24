@@ -1,0 +1,21 @@
+# Dracula – https://draculatheme.com
+name = "Dracula"
+
+[colors]
+bg = "#282a36"
+fg = "#f8f8f2"
+dim = "#6272a4"           # comment
+border = "#44475a"        # current line
+border_active = "#50fa7b" # green
+title = "#bd93f9"         # purple
+accent = "#8be9fd"        # cyan
+selection = "#44475a"
+prio_high = "#ff5555"     # red
+prio_low = "#6272a4"
+overdue = "#ff5555"
+today = "#f1fa8c"         # yellow
+done = "#50fa7b"
+key = "#ff79c6"           # pink
+warn = "#ffb86c"          # orange
+weekend = "#7f8ab8"
+holiday = "#ffb86c"

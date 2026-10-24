@@ -1,0 +1,21 @@
+# Solarized Dark – https://ethanschoonover.com/solarized/
+name = "Solarized Dark"
+
+[colors]
+bg = "#002b36"            # base03
+fg = "#839496"            # base0
+dim = "#586e75"           # base01
+border = "#073642"        # base02
+border_active = "#859900" # green
+title = "#268bd2"         # blue
+accent = "#2aa198"        # cyan
+selection = "#073642"
+prio_high = "#dc322f"     # red
+prio_low = "#586e75"
+overdue = "#dc322f"
+today = "#b58900"         # yellow
+done = "#859900"
+key = "#6c71c4"           # violet
+warn = "#cb4b16"          # orange
+weekend = "#657b83"       # base00
+holiday = "#cb4b16"

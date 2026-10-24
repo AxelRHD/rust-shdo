@@ -1,0 +1,21 @@
+# One Dark – https://github.com/atom/atom/tree/master/packages/one-dark-syntax
+name = "One Dark"
+
+[colors]
+bg = "#282c34"
+fg = "#abb2bf"
+dim = "#5c6370"           # comment
+border = "#4b5263"        # gutter
+border_active = "#98c379" # green
+title = "#61afef"         # blue
+accent = "#56b6c2"        # cyan
+selection = "#3e4451"
+prio_high = "#e06c75"     # red
+prio_low = "#5c6370"
+overdue = "#e06c75"
+today = "#e5c07b"         # yellow
+done = "#98c379"
+key = "#c678dd"           # purple
+warn = "#d19a66"          # orange
+weekend = "#828997"
+holiday = "#d19a66"

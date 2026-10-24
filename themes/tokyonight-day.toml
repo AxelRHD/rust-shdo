@@ -1,0 +1,21 @@
+# Tokyo Night Day – https://github.com/folke/tokyonight.nvim
+name = "Tokyo Night Day"
+
+[colors]
+bg = "#e1e2e7"
+fg = "#3760bf"
+dim = "#848cb5"           # comment
+border = "#a8aecb"        # fg_gutter
+border_active = "#587539" # green
+title = "#2e7de9"         # blue
+accent = "#007197"        # cyan
+selection = "#c4c8da"     # bg_highlight
+prio_high = "#f52a65"     # red
+prio_low = "#848cb5"
+overdue = "#f52a65"
+today = "#8c6c3e"         # yellow
+done = "#587539"
+key = "#9854f1"           # magenta
+warn = "#b15c00"          # orange
+weekend = "#6172b0"       # dark5
+holiday = "#b15c00"

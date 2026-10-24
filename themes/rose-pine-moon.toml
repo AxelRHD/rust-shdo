@@ -1,0 +1,21 @@
+# Rosé Pine Moon – https://rosepinetheme.com
+name = "Rosé Pine Moon"
+
+[colors]
+bg = "#232136"            # base
+fg = "#e0def4"            # text
+dim = "#6e6a86"           # muted
+border = "#44415a"        # highlight med
+border_active = "#9ccfd8" # foam
+title = "#c4a7e7"         # iris
+accent = "#ea9a97"        # rose
+selection = "#393552"     # overlay
+prio_high = "#eb6f92"     # love
+prio_low = "#6e6a86"
+overdue = "#eb6f92"
+today = "#f6c177"         # gold
+done = "#3e8fb0"          # pine
+key = "#c4a7e7"
+warn = "#f6c177"
+weekend = "#908caa"       # subtle
+holiday = "#ea9a97"

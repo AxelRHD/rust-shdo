@@ -1,0 +1,21 @@
+# Rosé Pine Dawn – https://rosepinetheme.com
+name = "Rosé Pine Dawn"
+
+[colors]
+bg = "#faf4ed"            # base
+fg = "#575279"            # text
+dim = "#9893a5"           # muted
+border = "#dfdad9"        # highlight med
+border_active = "#56949f" # foam
+title = "#907aa9"         # iris
+accent = "#d7827e"        # rose
+selection = "#f2e9e1"     # overlay
+prio_high = "#b4637a"     # love
+prio_low = "#9893a5"
+overdue = "#b4637a"
+today = "#ea9d34"         # gold
+done = "#286983"          # pine
+key = "#907aa9"
+warn = "#ea9d34"
+weekend = "#797593"       # subtle
+holiday = "#d7827e"

@@ -1,0 +1,21 @@
+# Rosé Pine – https://rosepinetheme.com
+name = "Rosé Pine"
+
+[colors]
+bg = "#191724"            # base
+fg = "#e0def4"            # text
+dim = "#6e6a86"           # muted
+border = "#403d52"        # highlight med
+border_active = "#9ccfd8" # foam
+title = "#c4a7e7"         # iris
+accent = "#ebbcba"        # rose
+selection = "#26233a"     # overlay
+prio_high = "#eb6f92"     # love
+prio_low = "#6e6a86"
+overdue = "#eb6f92"
+today = "#f6c177"         # gold
+done = "#31748f"          # pine
+key = "#c4a7e7"
+warn = "#f6c177"
+weekend = "#908caa"       # subtle
+holiday = "#ebbcba"

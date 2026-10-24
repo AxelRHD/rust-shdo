@@ -5,6 +5,8 @@
 - The form suggests known tags while you type one (`+rep` → `+reporting`, also in the
   tags field) and buckets after `@` in the title; `→` takes the grey suggestion over.
   Most used tags come first, tags already in the field are not suggested again
+- Eleven more built-in themes: Dracula, One Dark, Kanagawa, Everforest Dark/Light,
+  Rosé Pine, Rosé Pine Moon, Rosé Pine Dawn, Solarized Dark/Light and Tokyo Night Day
 - If shdo.toml is valid TOML but does not fit, the error names the installed version
   and suggests updating shdo – usually another machine wrote it with a newer version
 - The tags field shows finished tags as pills; Backspace removes a whole tag. Tags no

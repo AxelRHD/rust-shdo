@@ -1,0 +1,21 @@
+# Solarized Light – https://ethanschoonover.com/solarized/
+name = "Solarized Light"
+
+[colors]
+bg = "#fdf6e3"            # base3
+fg = "#657b83"            # base00
+dim = "#93a1a1"           # base1
+border = "#eee8d5"        # base2
+border_active = "#859900" # green
+title = "#268bd2"         # blue
+accent = "#2aa198"        # cyan
+selection = "#eee8d5"
+prio_high = "#dc322f"     # red
+prio_low = "#93a1a1"
+overdue = "#dc322f"
+today = "#b58900"         # yellow
+done = "#859900"
+key = "#6c71c4"           # violet
+warn = "#cb4b16"          # orange
+weekend = "#839496"       # base0
+holiday = "#cb4b16"
