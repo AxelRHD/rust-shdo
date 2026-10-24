@@ -1,5 +1,6 @@
 # Catppuccin Latte – https://catppuccin.com
 name = "Catppuccin Latte"
+dark = false
 
 [colors]
 bg = "#eff1f5"            # base

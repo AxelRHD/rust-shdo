@@ -1,5 +1,6 @@
 # Rosé Pine Dawn – https://rosepinetheme.com
 name = "Rosé Pine Dawn"
+dark = false
 
 [colors]
 bg = "#faf4ed"            # base

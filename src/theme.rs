@@ -87,12 +87,16 @@ pub struct Palette {
 pub struct Theme {
     pub id: String,
     pub name: String,
+    /// `dark = true/false` in the file; the picker lists dark themes first, then light
+    /// ones, then themes without it (e.g. the terminal's own colors).
+    pub dark: Option<bool>,
     pub c: Palette,
 }
 
 #[derive(serde::Deserialize)]
 struct ThemeFile {
     name: Option<String>,
+    dark: Option<bool>,
     #[serde(default)]
     colors: BTreeMap<String, String>,
 }
@@ -168,11 +172,13 @@ fn parse_theme(id: &str, raw: &str) -> Result<Theme> {
     Ok(Theme {
         id: id.into(),
         name: file.name.unwrap_or_else(|| id.into()),
+        dark: file.dark,
         c,
     })
 }
 
-/// All themes sorted by name: built-in and custom (a custom theme with the same ID wins).
+/// All themes, dark before light and each group sorted by name: built-in and custom
+/// (a custom theme with the same ID wins).
 /// Broken custom themes are returned as warnings.
 pub fn load_all(custom_dir: &Path) -> (Vec<Theme>, Vec<String>) {
     let mut themes: Vec<Theme> = BUILTIN
@@ -205,8 +211,17 @@ pub fn load_all(custom_dir: &Path) -> (Vec<Theme>, Vec<String>) {
             )),
         }
     }
-    themes.sort_by_key(|t| t.name.to_lowercase());
+    themes.sort_by_key(|t| (group(t.dark), t.name.to_lowercase()));
     (themes, warnings)
+}
+
+/// Picker group: dark, light, unspecified – so cycling does not flicker.
+pub fn group(dark: Option<bool>) -> u8 {
+    match dark {
+        Some(true) => 0,
+        Some(false) => 1,
+        None => 2,
+    }
 }
 
 #[cfg(test)]
@@ -218,10 +233,13 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let (themes, warnings) = load_all(tmp.path());
         assert!(warnings.is_empty());
-        let names: Vec<&str> = themes.iter().map(|t| t.name.as_str()).collect();
-        let mut sorted = names.clone();
-        sorted.sort_by_key(|n| n.to_lowercase());
-        assert_eq!(names, sorted);
+        let order: Vec<_> = themes
+            .iter()
+            .map(|t| (group(t.dark), t.name.to_lowercase()))
+            .collect();
+        assert!(order.is_sorted(), "{order:?}");
+        assert_eq!(themes.iter().filter(|t| t.dark == Some(false)).count(), 6);
+        assert_eq!(themes.last().unwrap().id, "terminal");
         let by_id = |id: &str| themes.iter().find(|t| t.id == id).unwrap();
         assert_eq!(by_id(DEFAULT_THEME).c.bg, Color::Rgb(0x1a, 0x1b, 0x26));
         assert_eq!(by_id("nord").c.bg, Color::Rgb(0x2e, 0x34, 0x40));

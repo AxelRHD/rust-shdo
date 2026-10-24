@@ -1,5 +1,6 @@
 # Tokyo Night – https://github.com/folke/tokyonight.nvim
 name = "Tokyo Night"
+dark = true
 
 [colors]
 bg = "#1a1b26"

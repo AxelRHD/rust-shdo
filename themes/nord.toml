@@ -1,5 +1,6 @@
 # Nord – https://www.nordtheme.com
 name = "Nord"
+dark = true
 
 [colors]
 bg = "#2e3440"            # nord0

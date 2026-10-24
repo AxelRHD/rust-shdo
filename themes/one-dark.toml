@@ -1,5 +1,6 @@
 # One Dark – https://github.com/atom/atom/tree/master/packages/one-dark-syntax
 name = "One Dark"
+dark = true
 
 [colors]
 bg = "#282c34"

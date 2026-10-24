@@ -620,6 +620,15 @@ status.warnings:
 theme.title:
   en: "Theme"
   de: "Theme"
+theme.dark:
+  en: "Dark"
+  de: "Dunkel"
+theme.light:
+  en: "Light"
+  de: "Hell"
+theme.other:
+  en: "Other"
+  de: "Sonstige"
 detail.title:
   en: "Details"
   de: "Details"

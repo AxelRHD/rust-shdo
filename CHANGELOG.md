@@ -7,6 +7,9 @@
   Most used tags come first, tags already in the field are not suggested again
 - Eleven more built-in themes: Dracula, One Dark, Kanagawa, Everforest Dark/Light,
   Rosé Pine, Rosé Pine Moon, Rosé Pine Dawn, Solarized Dark/Light and Tokyo Night Day
+- The theme picker lists dark themes first, then light ones (`dark = true/false` in the
+  theme file; themes without it come last), each group under its own heading and
+  sorted by name; the list scrolls when the terminal is too low
 - If shdo.toml is valid TOML but does not fit, the error names the installed version
   and suggests updating shdo – usually another machine wrote it with a newer version
 - The tags field shows finished tags as pills; Backspace removes a whole tag. Tags no

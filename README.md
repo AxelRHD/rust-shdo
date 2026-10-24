@@ -202,6 +202,7 @@ Missing colors fall back to the default theme:
 
 ```toml
 name = "My theme"
+dark = true   # picker lists dark themes first, then light ones
 
 [colors]
 bg = "#1a1b26"

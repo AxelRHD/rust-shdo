@@ -1,5 +1,6 @@
 # Rosé Pine – https://rosepinetheme.com
 name = "Rosé Pine"
+dark = true
 
 [colors]
 bg = "#191724"            # base

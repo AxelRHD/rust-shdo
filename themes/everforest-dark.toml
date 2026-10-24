@@ -1,5 +1,6 @@
 # Everforest Dark (medium) – https://github.com/sainnhe/everforest
 name = "Everforest Dark"
+dark = true
 
 [colors]
 bg = "#2d353b"            # bg0

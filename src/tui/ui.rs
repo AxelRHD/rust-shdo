@@ -775,42 +775,60 @@ fn draw_help(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {
 }
 
 fn draw_themes(f: &mut Frame, app: &App, c: &Palette, idx: usize) {
-    let lines: Vec<Line> = app
-        .themes
-        .iter()
-        .enumerate()
-        .map(|(i, t)| {
-            let sel = i == idx;
-            let swatch: Vec<Span> = [
-                t.c.title,
-                t.c.border_active,
-                t.c.prio_high,
-                t.c.today,
-                t.c.key,
-            ]
-            .into_iter()
-            .map(|col| Span::styled("●", Style::new().fg(col)))
-            .collect();
-            let mut spans = vec![
-                Span::styled(
-                    if sel { "→ " } else { "  " },
-                    Style::new().fg(c.border_active),
-                ),
-                Span::styled(
-                    format!("{:<20}", t.name),
-                    if sel {
-                        Style::new().bold()
-                    } else {
-                        Style::new()
-                    },
-                ),
-            ];
-            spans.extend(swatch);
-            Line::from(spans)
-        })
+    let mut lines: Vec<Line> = Vec::new();
+    let mut selected_line = 0;
+    let mut last_group = None;
+    for (i, t) in app.themes.iter().enumerate() {
+        // Heading per group (dark, light, other), as the themes are sorted that way
+        let group = crate::theme::group(t.dark);
+        if last_group != Some(group) {
+            if last_group.is_some() {
+                lines.push(Line::default());
+            }
+            let heading = match group {
+                0 => t!("theme.dark"),
+                1 => t!("theme.light"),
+                _ => t!("theme.other"),
+            };
+            lines.push(Line::styled(heading, Style::new().fg(c.title).bold()));
+            last_group = Some(group);
+        }
+        let sel = i == idx;
+        if sel {
+            selected_line = lines.len();
+        }
+        let swatch: Vec<Span> = [
+            t.c.title,
+            t.c.border_active,
+            t.c.prio_high,
+            t.c.today,
+            t.c.key,
+        ]
+        .into_iter()
+        .map(|col| Span::styled("●", Style::new().fg(col)))
         .collect();
+        let mut spans = vec![
+            Span::styled(
+                if sel { "→ " } else { "  " },
+                Style::new().fg(c.border_active),
+            ),
+            Span::styled(
+                format!("{:<20}", t.name),
+                if sel {
+                    Style::new().bold()
+                } else {
+                    Style::new()
+                },
+            ),
+        ];
+        spans.extend(swatch);
+        lines.push(Line::from(spans));
+    }
     let inner = popup(f, c, &t!("theme.title"), 36, lines.len() as u16 + 2);
-    f.render_widget(Paragraph::new(lines), inner);
+    // Scroll so the selected theme stays visible in a low terminal
+    let height = usize::from(inner.height.max(1));
+    let scroll = (selected_line + 1).saturating_sub(height);
+    f.render_widget(Paragraph::new(lines).scroll((scroll as u16, 0)), inner);
 }
 
 fn draw_detail(f: &mut Frame, app: &App, c: &Palette, scroll: u16) {

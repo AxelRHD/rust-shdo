@@ -1,5 +1,6 @@
 # Rosé Pine Moon – https://rosepinetheme.com
 name = "Rosé Pine Moon"
+dark = true
 
 [colors]
 bg = "#232136"            # base

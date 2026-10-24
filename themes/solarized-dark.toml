@@ -1,5 +1,6 @@
 # Solarized Dark – https://ethanschoonover.com/solarized/
 name = "Solarized Dark"
+dark = true
 
 [colors]
 bg = "#002b36"            # base03

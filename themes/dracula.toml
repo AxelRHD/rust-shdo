@@ -1,5 +1,6 @@
 # Dracula – https://draculatheme.com
 name = "Dracula"
+dark = true
 
 [colors]
 bg = "#282a36"

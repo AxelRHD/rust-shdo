@@ -1,5 +1,6 @@
 # Gruvbox Dark – https://github.com/morhetz/gruvbox
 name = "Gruvbox Dark"
+dark = true
 
 [colors]
 bg = "#282828"            # bg0
