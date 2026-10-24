@@ -82,6 +82,9 @@ io.invalid:
 store.not_initialized:
   en: "%{path} is not a shdo directory – run `shdo init` first"
   de: "%{path} ist kein shdo-Verzeichnis – zuerst `shdo init` ausführen"
+store.board_newer:
+  en: "%{path} does not fit this shdo (%{version}) – if another machine runs a newer version, update shdo here too"
+  de: "%{path} passt nicht zu diesem shdo (%{version}) – läuft auf einem anderen Rechner eine neuere Version, aktualisiere shdo auch hier"
 store.change_invalid:
   en: this change would make shdo.toml invalid
   de: Änderung würde shdo.toml ungültig machen

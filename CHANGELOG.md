@@ -5,6 +5,8 @@
 - The form suggests known tags while you type one (`+rep` → `+reporting`, also in the
   tags field) and buckets after `@` in the title; `→` takes the grey suggestion over.
   Most used tags come first, tags already in the field are not suggested again
+- If shdo.toml is valid TOML but does not fit, the error names the installed version
+  and suggests updating shdo – usually another machine wrote it with a newer version
 - The tags field shows finished tags as pills; Backspace removes a whole tag. Tags no
   task uses yet are marked as new, so a typo stands out before saving
 

@@ -162,7 +162,19 @@ impl Store {
                 return Err(e).with_context(|| t!("io.read", path = path.display()).into_owned());
             }
         };
-        parse_board(&raw).with_context(|| t!("io.invalid", path = path.display()).into_owned())
+        parse_board(&raw).with_context(|| {
+            // Valid TOML that does not fit: most likely written by a newer shdo
+            if raw.parse::<toml::Table>().is_ok() {
+                t!(
+                    "store.board_newer",
+                    path = path.display(),
+                    version = env!("CARGO_PKG_VERSION")
+                )
+                .into_owned()
+            } else {
+                t!("io.invalid", path = path.display()).into_owned()
+            }
+        })
     }
 
     fn board_doc(&self) -> Result<toml_edit::DocumentMut> {
@@ -662,5 +674,16 @@ mod tests {
         assert_eq!(tasks.len(), 1);
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].starts_with("kaputt.md"));
+    }
+
+    #[test]
+    fn unknown_board_format_suggests_an_update() {
+        let (_tmp, s) = store();
+        fs::write(s.dir.join(BOARD_FILE), "[[status]]\nkey = 1\n").unwrap();
+        let err = format!("{:#}", s.board_config().unwrap_err());
+        assert!(err.contains(env!("CARGO_PKG_VERSION")), "{err}");
+        fs::write(s.dir.join(BOARD_FILE), "[[status]\n").unwrap();
+        let err = format!("{:#}", s.board_config().unwrap_err());
+        assert!(!err.contains(env!("CARGO_PKG_VERSION")), "{err}");
     }
 }
